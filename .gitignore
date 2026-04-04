@@ -1,0 +1,5 @@
+data/vdem_v16.csv
+data/contiguity/
+data/atop/
+*.zip
+__pycache__/

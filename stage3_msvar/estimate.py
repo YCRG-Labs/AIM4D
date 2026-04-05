@@ -18,6 +18,7 @@ N_STATES = 5
 N_RESTARTS = 50
 DIRICHLET_DIAG = 50
 DIRICHLET_OFF = 2
+MIN_F1_MARGIN = 0.15
 STATE_LABELS = {
     0: "liberal_democracy",
     1: "electoral_democracy",
@@ -31,7 +32,12 @@ def load_inputs():
     factors = pd.read_csv(
         os.path.join(os.path.dirname(__file__), "..", "stage1_factors", "country_year_factors.csv")
     )
-    return factors
+    betas = pd.read_csv(
+        os.path.join(os.path.dirname(__file__), "..", "stage2_betas", "country_year_betas.csv")
+    )
+    beta_cols = [c for c in betas.columns if c.startswith("beta_")]
+    merged = factors.merge(betas[["country_name", "year"] + beta_cols], on=["country_name", "year"])
+    return merged, beta_cols
 
 
 def load_macro():
@@ -90,25 +96,31 @@ def prepare_sequences(df, obs_cols):
     return X_all, lengths, country_order
 
 
-def kmeans_init(X_all, n_states=N_STATES):
-    km = KMeans(n_clusters=n_states, n_init=30, random_state=42)
-    km.fit(X_all)
+def quantile_init(X_all, n_states=N_STATES):
+    f1 = X_all[:, 0]
+    quantiles = np.linspace(0, 100, n_states + 1)
+    thresholds = np.percentile(f1, quantiles)
 
-    order = np.argsort(-km.cluster_centers_[:, 0])
-    means = km.cluster_centers_[order]
+    means = np.zeros((n_states, X_all.shape[1]))
     covars = []
-    for k in range(n_states):
-        mask = km.labels_ == order[k]
-        if mask.sum() > X_all.shape[1] + 1:
-            cov = np.cov(X_all[mask].T) + 1e-4 * np.eye(X_all.shape[1])
-        else:
-            cov = np.eye(X_all.shape[1])
-        covars.append(cov)
 
-    print(f"K-means init (no V-Dem supervision):")
+    print(f"Quantile-based init (Factor 1 bands, no V-Dem supervision):")
     for s in range(n_states):
-        n = (km.labels_ == order[s]).sum()
-        print(f"  Cluster {s} ({STATE_LABELS[s]}): {n} obs, F1 mean={means[s, 0]:.3f}")
+        low = thresholds[n_states - s - 1]
+        high = thresholds[n_states - s]
+        mask = (f1 >= low) & (f1 < high) if s < n_states - 1 else (f1 >= low)
+        if s == 0:
+            mask = (f1 >= low)
+
+        if mask.sum() > X_all.shape[1] + 1:
+            means[s] = X_all[mask].mean(axis=0)
+            covars.append(np.cov(X_all[mask].T) + 1e-4 * np.eye(X_all.shape[1]))
+        else:
+            means[s] = X_all.mean(axis=0)
+            covars.append(np.eye(X_all.shape[1]))
+
+        print(f"  Band {s} ({STATE_LABELS[s]}): {mask.sum()} obs, "
+              f"F1 range=[{low:.3f}, {high:.3f}], F1 mean={means[s, 0]:.3f}")
 
     return means, np.array(covars)
 
@@ -163,7 +175,11 @@ def fit_baseline_hmm(X_all, lengths, init_means, init_covars):
             try:
                 model.fit(X_all, lengths)
                 score = model.score(X_all, lengths)
-                if np.all(np.diff(model.means_[:, 0]) <= 0) and score > best_score:
+                f1_means = model.means_[:, 0]
+                ordered = np.all(np.diff(f1_means) <= 0)
+                margins = -np.diff(f1_means)
+                well_separated = np.all(margins >= MIN_F1_MARGIN)
+                if ordered and well_separated and score > best_score:
                     best_score = score
                     best_model = model
             except Exception:
@@ -408,14 +424,14 @@ def lasso_select(state_df, macro, covariate_cols):
 def run_stage3():
     print("=== Stage 3: MS Regime Classification + TVTP ===\n")
 
-    df = load_inputs()
-    obs_cols = FACTOR_COLS
-    print(f"Features: {obs_cols}")
+    df, beta_cols = load_inputs()
+    obs_cols = FACTOR_COLS + beta_cols
+    print(f"Features ({len(obs_cols)}): {FACTOR_COLS} + {beta_cols}")
 
     X_all, lengths, country_order = prepare_sequences(df, obs_cols)
     print(f"Panel: {len(country_order)} countries, {sum(lengths)} obs\n")
 
-    init_means, init_covars = kmeans_init(X_all)
+    init_means, init_covars = quantile_init(X_all)
 
     print(f"\nPhase 1: Baseline HMM (K-means init, no supervision)...")
     baseline, base_score = fit_baseline_hmm(X_all, lengths, init_means, init_covars)

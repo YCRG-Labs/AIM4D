@@ -13,7 +13,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 FACTOR_COLS = ["factor_1", "factor_2", "factor_3", "factor_4"]
 N_STATES = 5
-N_RESTARTS = 30
+N_RESTARTS = 50
+DIRICHLET_PERSISTENCE = 50
+DIRICHLET_OFF_DIAG = 2
 STATE_LABELS = {
     0: "liberal_democracy",
     1: "electoral_democracy",
@@ -79,16 +81,16 @@ def semi_supervised_init(df, obs_cols, vdem):
 
     X = df[obs_cols].values
     init_means = np.zeros((N_STATES, len(obs_cols)))
-    init_covars = np.zeros((N_STATES, len(obs_cols)))
+    init_covars = np.zeros((N_STATES, len(obs_cols), len(obs_cols)))
 
     for s in range(N_STATES):
         mask = merged["init_state"].values == s
         if mask.sum() > len(obs_cols) + 1:
             init_means[s] = X[mask].mean(axis=0)
-            init_covars[s] = np.var(X[mask], axis=0) + 1e-4
+            init_covars[s] = np.cov(X[mask].T) + 1e-4 * np.eye(len(obs_cols))
         else:
             init_means[s] = X.mean(axis=0) + np.random.randn(len(obs_cols)) * 0.1
-            init_covars[s] = np.ones(len(obs_cols))
+            init_covars[s] = np.eye(len(obs_cols))
 
     for s in range(N_STATES):
         n = (merged["init_state"].values == s).sum()
@@ -118,6 +120,21 @@ def prepare_sequences(df, obs_cols):
     return X_all, lengths, country_order
 
 
+def regularize_transmat(P, n_states, alpha_diag=DIRICHLET_PERSISTENCE, alpha_off=DIRICHLET_OFF_DIAG):
+    alpha = np.full((n_states, n_states), alpha_off)
+    np.fill_diagonal(alpha, alpha_diag)
+
+    for i in range(n_states):
+        for j in range(n_states):
+            if abs(i - j) > 2:
+                alpha[i, j] = 0.1
+
+    counts = P * 100
+    smoothed = counts + alpha
+    smoothed /= smoothed.sum(axis=1, keepdims=True)
+    return smoothed
+
+
 def fit_hmm(X_all, lengths, init_means, init_covars, n_states=N_STATES, n_restarts=N_RESTARTS):
     init_transmat = np.full((n_states, n_states), 0.005)
     for i in range(n_states):
@@ -134,7 +151,7 @@ def fit_hmm(X_all, lengths, init_means, init_covars, n_states=N_STATES, n_restar
     for restart in range(n_restarts):
         model = hmm.GaussianHMM(
             n_components=n_states,
-            covariance_type="diag",
+            covariance_type="full",
             n_iter=500,
             tol=1e-5,
             random_state=restart,
@@ -203,6 +220,12 @@ def fit_hmm(X_all, lengths, init_means, init_covars, n_states=N_STATES, n_restar
         best_model.startprob_ = best_model.startprob_[reorder]
 
     print(f"\nBest log-likelihood: {best_score:.1f}")
+
+    raw_transmat = best_model.transmat_.copy()
+    best_model.transmat_ = regularize_transmat(raw_transmat, n_states)
+    print(f"\nTransition matrix regularized (Dirichlet α_diag={DIRICHLET_PERSISTENCE}, α_off={DIRICHLET_OFF_DIAG})")
+    print(f"  Min diagonal persistence: {np.min(np.diag(best_model.transmat_)):.3f}")
+
     return best_model, best_score
 
 
@@ -383,13 +406,8 @@ def run_stage3():
 
     df, factor_cols, beta_cols = load_inputs()
 
-    momentum_cols = add_momentum_features(df, factor_cols)
-    df = df.dropna(subset=momentum_cols)
-
-    obs_cols = factor_cols + momentum_cols
-    print(f"Observation vector: {len(obs_cols)} features")
-    print(f"  Factors: {factor_cols}")
-    print(f"  Momentum: {momentum_cols}")
+    obs_cols = factor_cols
+    print(f"Observation vector: {len(obs_cols)} features: {obs_cols}")
 
     vdem = load_vdem_regime()
 

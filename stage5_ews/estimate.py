@@ -277,6 +277,45 @@ def run_ews():
     print(f"  Stable democracy FPs: {len(sfp)}")
 
     print(f"\n{'='*60}")
+    print(f"Continuous risk score evaluation (AUC)")
+    print(f"{'='*60}\n")
+
+    from sklearn.metrics import roc_auc_score, average_precision_score
+
+    ews_eval = ews_df.copy()
+    ews_eval["label"] = ews_eval.apply(
+        lambda r: 1 if (r["country_name"], r["year"]) in known_w else 0, axis=1
+    )
+    valid = ews_eval.dropna(subset=["csd_index"])
+    if valid["label"].sum() > 0 and valid["label"].nunique() > 1:
+        auc_roc = roc_auc_score(valid["label"], valid["csd_index"])
+        auc_pr = average_precision_score(valid["label"], valid["csd_index"])
+        base_rate = valid["label"].mean()
+        lift = auc_pr / base_rate
+
+        print(f"  Base rate (positive class): {base_rate:.3f}")
+        print(f"  AUC-ROC: {auc_roc:.3f}")
+        print(f"  AUC-PR:  {auc_pr:.3f}")
+        print(f"  Lift over random: {lift:.1f}x")
+
+        oos = valid[valid["year"] > TRAIN_CUTOFF]
+        if oos["label"].sum() > 0 and oos["label"].nunique() > 1:
+            auc_roc_oos = roc_auc_score(oos["label"], oos["csd_index"])
+            auc_pr_oos = average_precision_score(oos["label"], oos["csd_index"])
+            print(f"  AUC-ROC (OOS): {auc_roc_oos:.3f}")
+            print(f"  AUC-PR (OOS):  {auc_pr_oos:.3f}")
+
+        top_pctiles = [99, 95, 90, 80]
+        print(f"\n  Risk score calibration:")
+        for p in top_pctiles:
+            thresh = valid["csd_index"].quantile(p / 100)
+            flagged = valid[valid["csd_index"] >= thresh]
+            if len(flagged) > 0:
+                prec_at_p = flagged["label"].mean()
+                recall_at_p = flagged["label"].sum() / valid["label"].sum()
+                print(f"    Top {100-p}%: precision={prec_at_p:.1%}, recall={recall_at_p:.1%} (thresh={thresh:.2f})")
+
+    print(f"\n{'='*60}")
     print(f"Case studies")
     print(f"{'='*60}\n")
 

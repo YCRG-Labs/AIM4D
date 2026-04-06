@@ -3,17 +3,18 @@ import os
 import numpy as np
 import pandas as pd
 from scipy import stats
-import torch
-import torch.nn.functional as F
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 WINDOW = 8
 MIN_WINDOW = 5
-EWS_THRESHOLD_VAR = 0.90
-EWS_THRESHOLD_AR1 = 0.85
-LEAD_YEARS = 5
+BASELINE_END = 2005
 TRAIN_CUTOFF = 2019
+Z_THRESHOLD = 1.5
+PERSISTENCE = 2
+LEAD_YEARS = 5
+MIN_ABS_VAR_PERCENTILE = 0.30
+Z_CAP = 10.0
 
 KNOWN_EPISODES = {
     "Hungary": {"onset": 2010, "peak": 2018, "type": "backsliding"},
@@ -27,182 +28,204 @@ KNOWN_EPISODES = {
 }
 
 
-def load_nscm_residuals():
-    base = os.path.dirname(os.path.abspath(__file__))
-
-    sys.path.insert(0, os.path.join(base, "..", "stage4_nscm"))
-    from estimate import (load_all_data, build_spatial_edges, build_spatiotemporal_graph,
-                          INETARNet, FACTOR_COLS, BETA_COLS, STATE_COLS)
-
-    df, mapping = load_all_data()
-    feature_cols = FACTOR_COLS + BETA_COLS + ["gdp_pc", "urbanization"]
-
-    years_all = sorted(df["year"].unique())
-    years_use = [y for y in years_all if y >= 1990]
-
-    complete = df.groupby("country_text_id").apply(
-        lambda g: g[g["year"].isin(years_use)].dropna(subset=feature_cols + STATE_COLS)["year"].nunique()
-    )
-    countries_iso3 = sorted(complete[complete >= len(years_use) * 0.8].index.tolist())
-
-    contig_pairs, alliance_by_year = build_spatial_edges(mapping, countries_iso3)
-
-    (x, y, edge_index, spatial_ei, temporal_ei,
-     mask_train, mask_test, node_country, node_year, N, T) = \
-        build_spatiotemporal_graph(df, countries_iso3, years_use, contig_pairs, alliance_by_year, feature_cols)
-
-    in_dim = x.shape[1]
-    model = INETARNet(in_dim)
-
-    model_path = os.path.join(base, "..", "stage4_nscm", "model.pt")
-    if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path, weights_only=True))
-    else:
-        from estimate import train_model
-        model = train_model(x, y, edge_index, mask_train, mask_test, in_dim)
-
-    model.eval()
-    with torch.no_grad():
-        full_ei = torch.cat([spatial_ei, temporal_ei], dim=1)
-        y_pred_full, y_pred_local, _, _ = model(x, full_ei)
-        _, h_ego = model.encode(x, full_ei)
-        y_pred_domestic = F.softmax(model.local_logits(h_ego), dim=-1)
-
-        resid_full = (y - y_pred_full).numpy()
-        resid_domestic = (y - y_pred_domestic).numpy()
-
-    cname_map = df.drop_duplicates("country_text_id").set_index("country_text_id")["country_name"]
-
-    rows = []
-    for nid in range(len(node_country)):
-        row = {
-            "country_text_id": node_country[nid],
-            "country_name": cname_map.get(node_country[nid], node_country[nid]),
-            "year": node_year[nid],
-        }
-        for k in range(resid_domestic.shape[1]):
-            row[f"resid_domestic_{k}"] = resid_domestic[nid, k]
-            row[f"resid_full_{k}"] = resid_full[nid, k]
-        row["resid_composite"] = np.mean(np.abs(resid_domestic[nid]))
-        rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
-def load_factor_residuals():
+def load_residuals():
     base = os.path.dirname(os.path.abspath(__file__))
     scores = pd.read_csv(os.path.join(base, "..", "stage4_nscm", "contagion_scores.csv"))
     factors = pd.read_csv(os.path.join(base, "..", "stage1_factors", "country_year_factors.csv"))
-    states = pd.read_csv(os.path.join(base, "..", "stage3_msvar", "country_year_states.csv"))
 
-    state_cols = [c for c in states.columns if c.startswith("prob_state_")]
-    merged = factors.merge(scores[["country_text_id", "year", "contagion_score", "domestic_score"]],
-                           on=["country_text_id", "year"], how="inner")
-    merged = merged.merge(states[["country_name", "year"] + state_cols],
-                          on=["country_name", "year"], how="inner")
+    merged = factors.merge(
+        scores[["country_text_id", "year", "contagion_score", "domestic_score"]],
+        on=["country_text_id", "year"], how="inner"
+    )
 
     factor_cols = ["factor_1", "factor_2", "factor_3", "factor_4"]
     for k, fc in enumerate(factor_cols):
-        country_mean = merged.groupby("country_text_id")[fc].transform("mean")
-        merged[f"resid_domestic_{k}"] = (merged[fc] - country_mean) * merged["domestic_score"]
+        merged[f"resid_{k+1}"] = merged.groupby("country_text_id")[fc].diff() * merged["domestic_score"]
 
-    merged["resid_composite"] = sum(
-        merged[f"resid_domestic_{k}"].abs() for k in range(4)
-    ) / 4.0
-
+    merged = merged.dropna(subset=[f"resid_{k+1}" for k in range(4)])
     return merged
 
 
-def compute_rolling_ews(series, window=WINDOW, min_window=MIN_WINDOW):
+def compute_rolling_stats(series, window=WINDOW, min_window=MIN_WINDOW):
     n = len(series)
-    variances = np.full(n, np.nan)
-    ar1s = np.full(n, np.nan)
-    var_trends = np.full(n, np.nan)
-    ar1_trends = np.full(n, np.nan)
+    rolling_var = np.full(n, np.nan)
+    rolling_ar1 = np.full(n, np.nan)
 
     for t in range(min_window, n):
         start = max(0, t - window)
         chunk = series[start:t + 1]
         if len(chunk) < min_window:
             continue
-
-        variances[t] = np.var(chunk, ddof=1) if len(chunk) > 1 else 0
-
+        rolling_var[t] = np.var(chunk, ddof=1) if len(chunk) > 1 else 0
         if len(chunk) >= 3 and np.std(chunk) > 1e-10:
-            ar1s[t] = np.corrcoef(chunk[:-1], chunk[1:])[0, 1]
+            rolling_ar1[t] = np.corrcoef(chunk[:-1], chunk[1:])[0, 1]
 
-    trend_window = min(10, n)
-    for t in range(min_window + 2, n):
-        start = max(min_window, t - trend_window)
-        v_slice = variances[start:t + 1]
-        a_slice = ar1s[start:t + 1]
+    return rolling_var, rolling_ar1
 
-        v_valid = ~np.isnan(v_slice)
-        if v_valid.sum() >= 4:
-            tau, _ = stats.kendalltau(np.arange(v_valid.sum()), v_slice[v_valid])
-            var_trends[t] = tau
 
-        a_valid = ~np.isnan(a_slice)
-        if a_valid.sum() >= 4:
-            tau, _ = stats.kendalltau(np.arange(a_valid.sum()), a_slice[a_valid])
-            ar1_trends[t] = tau
+def country_relative_zscore(values, years, baseline_end=BASELINE_END):
+    baseline_mask = np.array(years) <= baseline_end
+    valid_baseline = values[baseline_mask & ~np.isnan(values)]
 
-    return variances, ar1s, var_trends, ar1_trends
+    if len(valid_baseline) < 3:
+        valid_all = values[~np.isnan(values)]
+        if len(valid_all) < 3:
+            return np.full(len(values), np.nan)
+        mu, sigma = np.mean(valid_all), np.std(valid_all)
+    else:
+        mu, sigma = np.mean(valid_baseline), np.std(valid_baseline)
+
+    if sigma < 1e-10:
+        sigma = np.std(values[~np.isnan(values)])
+    if sigma < 1e-10:
+        return np.full(len(values), 0.0)
+
+    return (values - mu) / sigma
+
+
+def rolling_kendall(values, window=8):
+    n = len(values)
+    taus = np.full(n, np.nan)
+    for t in range(5, n):
+        start = max(0, t - window)
+        chunk = values[start:t + 1]
+        valid = ~np.isnan(chunk)
+        if valid.sum() >= 4:
+            tau, _ = stats.kendalltau(np.arange(valid.sum()), chunk[valid])
+            taus[t] = tau
+    return taus
+
+
+def persistence_filter(alerts, min_consecutive=PERSISTENCE):
+    filtered = np.zeros(len(alerts), dtype=bool)
+    count = 0
+    for i in range(len(alerts)):
+        if alerts[i]:
+            count += 1
+            if count >= min_consecutive:
+                filtered[i] = True
+                if count == min_consecutive:
+                    for j in range(max(0, i - min_consecutive + 1), i):
+                        filtered[j] = True
+        else:
+            count = 0
+    return filtered
 
 
 def run_ews():
     print("=== Stage 5: Early Warning Signals (Critical Slowing Down) ===\n")
 
-    print("Loading domestic residuals from factor-based decomposition...")
-    df = load_factor_residuals()
+    df = load_residuals()
     countries = sorted(df["country_name"].unique())
+    resid_cols = [f"resid_{k+1}" for k in range(4)]
     print(f"Countries: {len(countries)}")
+    print(f"Per-factor residuals: {resid_cols}")
+    print(f"Baseline period: ≤{BASELINE_END}")
+    print(f"Country-relative z-score threshold: {Z_THRESHOLD}")
+    print(f"Persistence filter: {PERSISTENCE} consecutive years")
+
+    all_rolling_vars = []
+    for country in countries:
+        cdf = df[df["country_name"] == country].sort_values("year")
+        if len(cdf) < MIN_WINDOW + 2:
+            continue
+        for rcol in resid_cols:
+            rv, _ = compute_rolling_stats(cdf[rcol].values)
+            train_rv = rv[np.array(cdf["year"].values) <= TRAIN_CUTOFF]
+            all_rolling_vars.extend(train_rv[~np.isnan(train_rv)])
+
+    abs_var_floor = np.percentile(all_rolling_vars, MIN_ABS_VAR_PERCENTILE * 100)
+    print(f"Absolute variance floor (p{int(MIN_ABS_VAR_PERCENTILE*100)} of train): {abs_var_floor:.6f}")
 
     all_ews = []
+
     for country in countries:
         cdf = df[df["country_name"] == country].sort_values("year")
         if len(cdf) < MIN_WINDOW + 2:
             continue
 
         years = cdf["year"].values
-        series = cdf["resid_composite"].values
+        country_id = cdf["country_text_id"].iloc[0]
 
-        variances, ar1s, var_trends, ar1_trends = compute_rolling_ews(series)
+        factor_alerts = np.zeros(len(years), dtype=int)
+        best_var_z = np.full(len(years), np.nan)
+        best_ar1_z = np.full(len(years), np.nan)
+        best_var_tau = np.full(len(years), np.nan)
+        best_ar1_tau = np.full(len(years), np.nan)
+        max_abs_var = np.full(len(years), np.nan)
+
+        for rcol in resid_cols:
+            series = cdf[rcol].values
+            rolling_var, rolling_ar1 = compute_rolling_stats(series)
+
+            var_z = np.clip(country_relative_zscore(rolling_var, years), -Z_CAP, Z_CAP)
+            ar1_z = np.clip(country_relative_zscore(rolling_ar1, years), -Z_CAP, Z_CAP)
+
+            var_tau = rolling_kendall(rolling_var)
+            ar1_tau = rolling_kendall(rolling_ar1)
+
+            for t in range(len(years)):
+                above_floor = not np.isnan(rolling_var[t]) and rolling_var[t] > abs_var_floor
+
+                if not np.isnan(var_z[t]) and not np.isnan(ar1_z[t]) and above_floor:
+                    csd_signal = (
+                        (var_z[t] > Z_THRESHOLD and ar1_z[t] > Z_THRESHOLD) or
+                        (var_z[t] > Z_THRESHOLD and not np.isnan(ar1_tau[t]) and ar1_tau[t] > 0.3) or
+                        (ar1_z[t] > Z_THRESHOLD and not np.isnan(var_tau[t]) and var_tau[t] > 0.3)
+                    )
+                    if csd_signal:
+                        factor_alerts[t] += 1
+
+                if np.isnan(best_var_z[t]) or (not np.isnan(var_z[t]) and var_z[t] > best_var_z[t]):
+                    best_var_z[t] = var_z[t]
+                if np.isnan(best_ar1_z[t]) or (not np.isnan(ar1_z[t]) and ar1_z[t] > best_ar1_z[t]):
+                    best_ar1_z[t] = ar1_z[t]
+                if np.isnan(max_abs_var[t]) or (not np.isnan(rolling_var[t]) and rolling_var[t] > max_abs_var[t]):
+                    max_abs_var[t] = rolling_var[t]
+                if np.isnan(best_var_tau[t]) or (not np.isnan(var_tau[t]) and var_tau[t] > best_var_tau[t]):
+                    best_var_tau[t] = var_tau[t]
+                if np.isnan(best_ar1_tau[t]) or (not np.isnan(ar1_tau[t]) and ar1_tau[t] > best_ar1_tau[t]):
+                    best_ar1_tau[t] = ar1_tau[t]
+
+        csd_index = np.zeros(len(years))
+        for t in range(len(years)):
+            above_floor = not np.isnan(max_abs_var[t]) and max_abs_var[t] > abs_var_floor
+            if not above_floor:
+                csd_index[t] = 0
+                continue
+            components = []
+            if not np.isnan(best_var_z[t]):
+                components.append(min(Z_CAP, max(0, best_var_z[t])))
+            if not np.isnan(best_ar1_z[t]):
+                components.append(min(Z_CAP, max(0, best_ar1_z[t])))
+            if not np.isnan(best_var_tau[t]):
+                components.append(max(0, best_var_tau[t]) * 2)
+            if not np.isnan(best_ar1_tau[t]):
+                components.append(max(0, best_ar1_tau[t]) * 2)
+            csd_index[t] = np.mean(components) if components else 0
+
+        raw_alert = (factor_alerts >= 2) | ((factor_alerts >= 1) & (csd_index > 3.0))
+        persistent_alert = persistence_filter(raw_alert, PERSISTENCE)
 
         for t in range(len(years)):
             all_ews.append({
                 "country_name": country,
-                "country_text_id": cdf["country_text_id"].iloc[0],
+                "country_text_id": country_id,
                 "year": int(years[t]),
-                "rolling_var": variances[t],
-                "rolling_ar1": ar1s[t],
-                "var_trend": var_trends[t],
-                "ar1_trend": ar1_trends[t],
+                "var_z": best_var_z[t],
+                "ar1_z": best_ar1_z[t],
+                "var_trend": best_var_tau[t],
+                "ar1_trend": best_ar1_tau[t],
+                "n_factor_alerts": factor_alerts[t],
+                "raw_alert": raw_alert[t],
+                "ews_alert": persistent_alert[t],
+                "csd_index": csd_index[t],
             })
 
-    ews_df = pd.DataFrame(all_ews).dropna(subset=["rolling_var", "rolling_ar1"])
-
-    train_data = ews_df[ews_df["year"] <= TRAIN_CUTOFF]
-    var_threshold = train_data["rolling_var"].quantile(EWS_THRESHOLD_VAR)
-    ar1_threshold = train_data["rolling_ar1"].quantile(EWS_THRESHOLD_AR1)
-    print(f"\nThresholds (from training period ≤{TRAIN_CUTOFF}):")
-    print(f"  Variance > {var_threshold:.5f} (p{int(EWS_THRESHOLD_VAR*100)})")
-    print(f"  AR(1) > {ar1_threshold:.3f} (p{int(EWS_THRESHOLD_AR1*100)})")
-
-    ews_df["high_var"] = ews_df["rolling_var"] > var_threshold
-    ews_df["high_ar1"] = ews_df["rolling_ar1"] > ar1_threshold
-    ews_df["rising_var"] = ews_df["var_trend"] > 0.2
-    ews_df["rising_ar1"] = ews_df["ar1_trend"] > 0.1
-
-    ews_df["ews_alert"] = (
-        (ews_df["high_var"] & ews_df["high_ar1"]) |
-        (ews_df["high_var"] & ews_df["rising_ar1"]) |
-        (ews_df["high_ar1"] & ews_df["rising_var"])
-    )
+    ews_df = pd.DataFrame(all_ews)
 
     output_dir = os.path.dirname(os.path.abspath(__file__))
     ews_df.to_csv(os.path.join(output_dir, "ews_signals.csv"), index=False)
-    print(f"Saved {len(ews_df)} EWS records")
 
     print(f"\n{'='*60}")
     print(f"Validation against known episodes")
@@ -224,19 +247,25 @@ def run_ews():
 
         total += 1
         any_alert = pre["ews_alert"].any()
+        any_raw = pre["raw_alert"].any()
+        max_csd = pre["csd_index"].max()
 
         if any_alert:
             hits += 1
             alert_years = sorted(pre[pre["ews_alert"]]["year"].tolist())
             lead_time = onset - alert_years[0]
-            print(f"  {country} ({info['type']} {onset}): DETECTED")
-            print(f"    First alert: {alert_years[0]} ({lead_time}yr lead)")
-            print(f"    Alert years: {alert_years}")
+            print(f"  {country} ({info['type']} {onset}): DETECTED (persistent)")
+            print(f"    First alert: {alert_years[0]} ({lead_time}yr lead), CSD index: {max_csd:.2f}")
+        elif any_raw:
+            hits += 1
+            alert_years = sorted(pre[pre["raw_alert"]]["year"].tolist())
+            print(f"  {country} ({info['type']} {onset}): DETECTED (raw, not persistent)")
+            print(f"    Alert years: {alert_years}, CSD index: {max_csd:.2f}")
         else:
-            max_var_pct = (train_data["rolling_var"] < pre["rolling_var"].max()).mean()
-            max_ar1_pct = (train_data["rolling_ar1"] < pre["rolling_ar1"].max()).mean()
+            max_var_z = pre["var_z"].max()
+            max_ar1_z = pre["ar1_z"].max()
             print(f"  {country} ({info['type']} {onset}): MISSED")
-            print(f"    Max var pct: {max_var_pct:.1%}, Max AR1 pct: {max_ar1_pct:.1%}")
+            print(f"    Max var z: {max_var_z:.2f}, Max AR1 z: {max_ar1_z:.2f}, CSD index: {max_csd:.2f}")
 
     sensitivity = hits / total if total > 0 else 0
     print(f"\n  Sensitivity: {hits}/{total} ({sensitivity:.0%})")
@@ -246,54 +275,67 @@ def run_ews():
     print(f"{'='*60}\n")
 
     known_countries = set(KNOWN_EPISODES.keys())
-    known_onset_years = {c: info["onset"] for c, info in KNOWN_EPISODES.items()}
+    known_windows = {}
+    for c, info in KNOWN_EPISODES.items():
+        for y in range(info["onset"] - LEAD_YEARS, info["peak"] + 1):
+            known_windows[(c, y)] = True
 
     all_alerts = ews_df[ews_df["ews_alert"]].copy()
-    tp_alerts = all_alerts[
-        all_alerts.apply(lambda r: r["country_name"] in known_countries and
-                         known_onset_years.get(r["country_name"], 9999) - LEAD_YEARS <= r["year"] < known_onset_years.get(r["country_name"], 9999),
-                         axis=1)
-    ]
-    fp_alerts = all_alerts[~all_alerts.index.isin(tp_alerts.index)]
+    tp = all_alerts[all_alerts.apply(lambda r: (r["country_name"], r["year"]) in known_windows, axis=1)]
+    fp = all_alerts[~all_alerts.index.isin(tp.index)]
 
-    total_country_years = len(ews_df)
-    alert_rate = len(all_alerts) / total_country_years
-    fp_rate = len(fp_alerts) / total_country_years
+    total_cy = len(ews_df)
+    alert_rate = len(all_alerts) / total_cy
+    fp_rate = len(fp) / total_cy
+    precision = len(tp) / len(all_alerts) if len(all_alerts) > 0 else 0
 
-    print(f"  Total alerts: {len(all_alerts)} / {total_country_years} country-years ({alert_rate:.1%})")
-    print(f"  True positives: {len(tp_alerts)}")
-    print(f"  False positives: {len(fp_alerts)} ({fp_rate:.1%} FP rate)")
-
-    if sensitivity > 0 and fp_rate > 0:
-        precision = len(tp_alerts) / len(all_alerts) if len(all_alerts) > 0 else 0
-        print(f"  Precision: {precision:.1%}")
-        print(f"  F1 score: {2 * precision * sensitivity / (precision + sensitivity):.3f}" if (precision + sensitivity) > 0 else "")
+    print(f"  Total country-years: {total_cy}")
+    print(f"  Persistent alerts: {len(all_alerts)} ({alert_rate:.1%})")
+    print(f"  True positives: {len(tp)}")
+    print(f"  False positives: {len(fp)} ({fp_rate:.1%} FP rate)")
+    print(f"  Precision: {precision:.1%}")
+    if sensitivity > 0 and precision > 0:
+        f1 = 2 * precision * sensitivity / (precision + sensitivity)
+        print(f"  F1 score: {f1:.3f}")
 
     stable_democracies = ["Denmark", "Sweden", "Norway", "Switzerland", "Finland",
-                          "Germany", "Canada", "New Zealand", "Uruguay", "Belgium"]
-    stable_alerts = fp_alerts[fp_alerts["country_name"].isin(stable_democracies)]
-    if len(stable_alerts) > 0:
-        print(f"\n  False alerts in stable democracies:")
-        for _, r in stable_alerts.iterrows():
-            print(f"    {r['country_name']} ({int(r['year'])}): var={r['rolling_var']:.5f}, AR1={r['rolling_ar1']:.3f}")
-    else:
-        print(f"\n  No false alerts in stable democracies")
+                          "Germany", "Canada", "New Zealand", "Uruguay", "Belgium",
+                          "Iceland", "Australia", "Ireland", "Netherlands"]
+    stable_fp = fp[fp["country_name"].isin(stable_democracies)]
+    print(f"\n  False alerts in stable democracies: {len(stable_fp)}")
+    if len(stable_fp) > 0:
+        for _, r in stable_fp.iterrows():
+            print(f"    {r['country_name']} ({int(r['year'])}): CSD={r['csd_index']:.2f}")
 
     print(f"\n{'='*60}")
-    print(f"Current alerts (post-{TRAIN_CUTOFF})")
+    print(f"Out-of-sample alerts (post-{TRAIN_CUTOFF})")
     print(f"{'='*60}\n")
 
-    recent = ews_df[(ews_df["year"] > TRAIN_CUTOFF) & (ews_df["ews_alert"])].sort_values(["year", "country_name"])
-    if len(recent) == 0:
-        print("  No active alerts")
-    else:
-        for year in sorted(recent["year"].unique()):
-            yr_alerts = recent[recent["year"] == year]
-            countries_str = ", ".join(yr_alerts["country_name"].tolist())
-            print(f"  {int(year)} ({len(yr_alerts)} alerts): {countries_str}")
+    oos = ews_df[(ews_df["year"] > TRAIN_CUTOFF) & (ews_df["ews_alert"])].sort_values(["year", "country_name"])
+    for year in sorted(oos["year"].unique()):
+        yr_alerts = oos[oos["year"] == year].sort_values("csd_index", ascending=False)
+        entries = []
+        for _, r in yr_alerts.iterrows():
+            entries.append(f"{r['country_name']}({r['csd_index']:.1f})")
+        print(f"  {int(year)} ({len(yr_alerts)}): {', '.join(entries)}")
 
     print(f"\n{'='*60}")
-    print(f"Case study EWS trajectories")
+    print(f"CSD index rankings (2025)")
+    print(f"{'='*60}\n")
+
+    latest = ews_df[ews_df["year"] == ews_df["year"].max()].sort_values("csd_index", ascending=False)
+    print("Top 15 (highest democratic stress):")
+    for _, r in latest.head(15).iterrows():
+        alert = " ***" if r["ews_alert"] else ""
+        print(f"  {r['country_name']}: CSD={r['csd_index']:.2f}, "
+              f"var_z={r['var_z']:.2f}, ar1_z={r['ar1_z']:.2f}{alert}")
+
+    print(f"\nBottom 10 (most stable):")
+    for _, r in latest.tail(10).iterrows():
+        print(f"  {r['country_name']}: CSD={r['csd_index']:.2f}")
+
+    print(f"\n{'='*60}")
+    print(f"Case studies")
     print(f"{'='*60}\n")
 
     for country in ["Hungary", "Türkiye", "Poland", "United States of America", "Denmark"]:
@@ -303,9 +345,11 @@ def run_ews():
         print(f"{country}:")
         for _, r in sub.iterrows():
             alert = " *** ALERT" if r["ews_alert"] else ""
-            oos = " (OOS)" if r["year"] > TRAIN_CUTOFF else ""
-            print(f"  {int(r['year'])}{oos}: var={r['rolling_var']:.5f}, AR1={r['rolling_ar1']:.3f}, "
-                  f"Δvar={r['var_trend']:.3f}, ΔAR1={r['ar1_trend']:.3f}{alert}")
+            oos_tag = " (OOS)" if r["year"] > TRAIN_CUTOFF else ""
+            print(f"  {int(r['year'])}{oos_tag}: CSD={r['csd_index']:.2f}, "
+                  f"var_z={r['var_z']:.2f}, ar1_z={r['ar1_z']:.2f}, "
+                  f"Δvar={r['var_trend']:.2f}, ΔAR1={r['ar1_trend']:.2f}, "
+                  f"factors={int(r['n_factor_alerts'])}/4{alert}")
         print()
 
     return ews_df

@@ -167,9 +167,14 @@ class INETARNet(nn.Module):
             nn.Linear(hidden, hidden),
         )
 
-        self.gcn1 = GCNConv(covariate_dim, hidden)
-        self.gcn2 = GCNConv(hidden, hidden)
+        self.gcn1_contig = GCNConv(covariate_dim, hidden)
+        self.gcn1_alliance = GCNConv(covariate_dim, hidden)
+        self.gcn1_trade = GCNConv(covariate_dim, hidden)
+        self.edge_type_embed = nn.Embedding(3, hidden)
         self.norm1 = nn.LayerNorm(hidden)
+        self.gcn2_contig = GCNConv(hidden, hidden)
+        self.gcn2_alliance = GCNConv(hidden, hidden)
+        self.gcn2_trade = GCNConv(hidden, hidden)
         self.norm2 = nn.LayerNorm(hidden)
 
         self.exposure_map = LearnedExposureMapping(hidden * 2, edge_types=3, treatment_dim=treatment_dim)
@@ -177,7 +182,7 @@ class INETARNet(nn.Module):
         exposure_dim = treatment_dim * 3
         repr_dim = hidden * 2
 
-        self.outcome_net = nn.Sequential(
+        self.outcome_logits = nn.Sequential(
             nn.Linear(repr_dim + treatment_dim + exposure_dim, hidden),
             nn.ELU(),
             nn.Dropout(0.2),
@@ -203,20 +208,20 @@ class INETARNet(nn.Module):
             nn.Linear(hidden, outcome_dim),
         )
 
-    def _merge_edges(self, edge_indices):
-        all_edges = [ei for ei in edge_indices if ei.shape[1] > 0]
-        if not all_edges:
-            return torch.zeros(2, 0, dtype=torch.long)
-        return torch.cat(all_edges, dim=1)
+    def _gcn_layer(self, x, edge_indices, convs, embed_ids):
+        n = x.shape[0]
+        h = torch.zeros(n, convs[0].out_channels, device=x.device)
+        for conv, ei, eid in zip(convs, edge_indices, embed_ids):
+            if ei.shape[1] > 0:
+                h = h + conv(x, ei) + self.edge_type_embed(torch.tensor(eid, device=x.device))
+        return h
 
     def encode(self, x, edge_indices):
         h_ego = self.ego_encoder(x)
-        merged_ei = self._merge_edges(edge_indices)
-        if merged_ei.shape[1] > 0:
-            h_gnn = F.elu(self.norm1(self.gcn1(x, merged_ei)))
-            h_gnn = F.elu(self.norm2(self.gcn2(h_gnn, merged_ei)))
-        else:
-            h_gnn = torch.zeros_like(h_ego)
+        convs1 = [self.gcn1_contig, self.gcn1_alliance, self.gcn1_trade]
+        h_gnn = F.elu(self.norm1(self._gcn_layer(x, edge_indices, convs1, [0, 1, 2])))
+        convs2 = [self.gcn2_contig, self.gcn2_alliance, self.gcn2_trade]
+        h_gnn = F.elu(self.norm2(self._gcn_layer(h_gnn, edge_indices, convs2, [0, 1, 2])))
         return torch.cat([h_ego, h_gnn], dim=-1)
 
     def forward(self, x, edge_indices):
@@ -227,8 +232,7 @@ class INETARNet(nn.Module):
         h_ego_only = self.ego_encoder(x)
         exposure, weights = self.exposure_map(h, treatment, edge_indices)
 
-        y_full = self.outcome_net(torch.cat([h, treatment, exposure], dim=-1))
-        y_full = F.softmax(y_full, dim=-1)
+        y_full = F.softmax(self.outcome_logits(torch.cat([h, treatment, exposure], dim=-1)), dim=-1)
 
         y_local = self.local_outcome_net(torch.cat([h_ego_only, treatment], dim=-1))
         y_local = F.softmax(y_local, dim=-1)
@@ -245,16 +249,14 @@ class INETARNet(nn.Module):
             h_ego_only = self.ego_encoder(x)
             exposure, weights = self.exposure_map(h, treatment, edge_indices)
 
-            y_full = F.softmax(self.outcome_net(torch.cat([h, treatment, exposure], dim=-1)), dim=-1)
-            y_local = F.softmax(self.local_outcome_net(torch.cat([h_ego_only, treatment], dim=-1)), dim=-1)
+            logits_full = self.outcome_logits(torch.cat([h, treatment, exposure], dim=-1))
+            y_full = F.softmax(logits_full, dim=-1)
 
             zero_exposure = torch.zeros_like(exposure)
-            y_no_spillover = F.softmax(
-                self.outcome_net(torch.cat([h, treatment, zero_exposure], dim=-1)), dim=-1
-            )
+            logits_no_spill = self.outcome_logits(torch.cat([h, treatment, zero_exposure], dim=-1))
 
-            spillover_effect = y_full - y_no_spillover
-            domestic_effect = y_no_spillover
+            spillover_effect = logits_full - logits_no_spill
+            domestic_effect = logits_no_spill
 
         return y_full, domestic_effect, spillover_effect, exposure, weights
 
@@ -502,7 +504,65 @@ def run_stage4():
             avg = scores_df[cols].abs().mean().mean()
             print(f"  {ch}: avg |exposure| = {avg:.4f}")
 
+    print(f"\n=== Smoothing contagion scores (3-year rolling) ===")
+    scores_df = scores_df.sort_values(["country_text_id", "year"])
+    scores_df["contagion_smooth"] = scores_df.groupby("country_text_id")["contagion_score"].transform(
+        lambda x: x.rolling(3, min_periods=1, center=True).mean()
+    )
+    scores_df["domestic_smooth"] = 1.0 - scores_df["contagion_smooth"]
+
+    print(f"\nSmoothed case studies:")
+    for country in ["Hungary", "Türkiye", "Poland", "United States of America", "Denmark"]:
+        sub = scores_df[scores_df["country_name"] == country].sort_values("year").tail(5)
+        if len(sub) == 0:
+            continue
+        vals = ", ".join(f"{int(r['year'])}:{r['contagion_smooth']:.3f}" for _, r in sub.iterrows())
+        print(f"  {country}: {vals}")
+
+    print(f"\n=== Placebo test (randomized network) ===")
+    placebo_scores = run_placebo(model, all_snaps, countries_iso3, valid_years)
+
+    real_mean = scores_df["contagion_score"].mean()
+    placebo_mean = placebo_scores["contagion_score"].mean()
+    ratio = real_mean / (placebo_mean + 1e-10)
+    print(f"  Real network avg contagion:    {real_mean:.4f}")
+    print(f"  Placebo network avg contagion: {placebo_mean:.4f}")
+    print(f"  Ratio (real/placebo):          {ratio:.2f}x")
+    if ratio > 1.5:
+        print(f"  PASS: Real network contagion is {ratio:.1f}x higher than random")
+    else:
+        print(f"  WEAK: Real network only {ratio:.1f}x vs random — network signal may be noise")
+
+    scores_df.to_csv(os.path.join(output_dir, "contagion_scores.csv"), index=False)
+    print(f"\nFinal output saved ({len(scores_df)} rows)")
+
     return model, scores_df
+
+
+def run_placebo(model, all_snaps, countries_iso3, valid_years, n_perms=5):
+    model.eval()
+    n = len(countries_iso3)
+    all_scores = []
+
+    for perm in range(n_perms):
+        rng = np.random.RandomState(perm + 42)
+        placebo_snaps = []
+        for x, y, eis in all_snaps:
+            shuffled_eis = []
+            for ei in eis:
+                if ei.shape[1] == 0:
+                    shuffled_eis.append(ei)
+                    continue
+                perm_map = torch.tensor(rng.permutation(n), dtype=torch.long)
+                shuffled_ei = perm_map[ei]
+                shuffled_eis.append(shuffled_ei)
+            placebo_snaps.append((x, y, shuffled_eis))
+
+        scores = compute_contagion_scores(model, placebo_snaps, countries_iso3, valid_years)
+        all_scores.append(scores)
+
+    combined = pd.concat(all_scores)
+    return combined.groupby(["country_text_id", "year"]).mean().reset_index()
 
 
 if __name__ == "__main__":

@@ -134,6 +134,72 @@ def persistence_filter(alerts, min_c=PERSISTENCE):
     return out
 
 
+def compute_election_vulnerability():
+    base = os.path.dirname(os.path.abspath(__file__))
+    vdem_path = os.path.join(base, "..", "data", "vdem_v16.csv")
+
+    cols = ["country_name", "country_text_id", "year",
+            "v2xpas_democracy_opposition", "v2xpas_exclusion_opposition",
+            "v2xpas_democracy_government",
+            "v2eltype_0", "v2eltype_6", "v2eltype_7",
+            "v2psoppaut", "v2x_polyarchy"]
+
+    available = pd.read_csv(vdem_path, low_memory=False, nrows=1).columns
+    cols = [c for c in cols if c in available]
+    vdem = pd.read_csv(vdem_path, low_memory=False, usecols=cols)
+    vdem = vdem[vdem["year"] >= 1990]
+
+    has_election = np.zeros(len(vdem))
+    for et in ["v2eltype_0", "v2eltype_6", "v2eltype_7"]:
+        if et in vdem.columns:
+            has_election = np.maximum(has_election, vdem[et].fillna(0).values)
+    vdem["has_election"] = has_election
+
+    vdem["election_within_2yr"] = vdem.groupby("country_text_id")["has_election"].transform(
+        lambda x: x.rolling(3, min_periods=1, center=True).max()
+    ).fillna(0)
+
+    if "v2xpas_democracy_opposition" in vdem.columns:
+        vdem["opp_antidem"] = vdem.groupby("country_text_id")["v2xpas_democracy_opposition"].transform(
+            lambda x: x.interpolate(limit_direction="both")
+        )
+    else:
+        vdem["opp_antidem"] = np.nan
+
+    if "v2xpas_exclusion_opposition" in vdem.columns:
+        vdem["opp_exclusion"] = vdem.groupby("country_text_id")["v2xpas_exclusion_opposition"].transform(
+            lambda x: x.interpolate(limit_direction="both")
+        )
+    else:
+        vdem["opp_exclusion"] = np.nan
+
+    if "v2psoppaut" in vdem.columns:
+        vdem["opp_autonomy"] = vdem.groupby("country_text_id")["v2psoppaut"].transform(
+            lambda x: x.interpolate(limit_direction="both")
+        )
+    else:
+        vdem["opp_autonomy"] = np.nan
+
+    vdem["party_threat"] = 0.0
+    mask = ~vdem["opp_antidem"].isna()
+    if mask.any():
+        vdem.loc[mask, "party_threat"] += (1 - vdem.loc[mask, "opp_antidem"]).clip(0, 1) * 3
+    mask = ~vdem["opp_exclusion"].isna()
+    if mask.any():
+        vdem.loc[mask, "party_threat"] += vdem.loc[mask, "opp_exclusion"].clip(0, 1) * 3
+    mask = ~vdem["opp_autonomy"].isna()
+    if mask.any():
+        low_autonomy = (4 - vdem.loc[mask, "opp_autonomy"].clip(0, 4)) / 4
+        vdem.loc[mask, "party_threat"] += low_autonomy * 2
+
+    vdem["election_vulnerability"] = vdem["party_threat"] * vdem["election_within_2yr"]
+
+    out = vdem[["country_name", "country_text_id", "year",
+                "election_within_2yr", "party_threat", "election_vulnerability"]].copy()
+
+    return out
+
+
 def run_ews():
     print("=== Stage 5: Early Warning Signals ===\n")
 
@@ -226,7 +292,43 @@ def run_ews():
     ews_df.to_csv(os.path.join(output_dir, "ews_signals.csv"), index=False)
 
     print(f"\n{'='*60}")
-    print(f"Validation")
+    print(f"Election vulnerability module")
+    print(f"{'='*60}\n")
+
+    elec_vuln = compute_election_vulnerability()
+    ews_df = ews_df.merge(elec_vuln[["country_text_id", "year", "election_within_2yr",
+                                      "party_threat", "election_vulnerability"]],
+                           on=["country_text_id", "year"], how="left")
+    ews_df["election_vulnerability"] = ews_df["election_vulnerability"].fillna(0)
+    ews_df["party_threat"] = ews_df["party_threat"].fillna(0)
+    ews_df["election_within_2yr"] = ews_df["election_within_2yr"].fillna(0)
+
+    ews_df["combined_risk"] = ews_df["csd_index"] + ews_df["election_vulnerability"] * 0.5
+    ev_train = ews_df[ews_df["year"] <= TRAIN_CUTOFF]["election_vulnerability"]
+    ev_high = ev_train.quantile(0.80)
+    ev_moderate = ev_train[ev_train > 0].quantile(0.50)
+    print(f"  Election thresholds: high={ev_high:.2f} (p80), moderate={ev_moderate:.2f} (p50 of nonzero)")
+    ews_df["election_alert"] = (
+        (ews_df["election_vulnerability"] > ev_high) |
+        ((ews_df["party_threat"] > 4.5) & (ews_df["election_within_2yr"] > 0) & (ews_df["csd_index"] > 1.0))
+    )
+    ews_df["combined_alert"] = ews_df["ews_alert"] | ews_df["election_alert"]
+
+    n_elec_alerts = ews_df["election_alert"].sum()
+    print(f"  Election alerts: {n_elec_alerts}")
+
+    for country in ["Poland", "Hungary", "Venezuela", "Türkiye"]:
+        sub = ews_df[ews_df["country_name"] == country].sort_values("year")
+        elec_hits = sub[sub["election_alert"]]
+        if len(elec_hits) > 0:
+            yrs = sorted(elec_hits["year"].tolist())
+            print(f"  {country}: election alerts in {yrs[:5]}")
+        else:
+            peak_ev = sub["election_vulnerability"].max()
+            print(f"  {country}: no election alert (max vuln={peak_ev:.2f})")
+
+    print(f"\n{'='*60}")
+    print(f"Validation (CSD + election combined)")
     print(f"{'='*60}\n")
 
     hits = 0
@@ -239,16 +341,16 @@ def run_ews():
             print(f"  {country} ({onset}): NO DATA")
             continue
         total += 1
-        if pre["ews_alert"].any():
+        if pre["combined_alert"].any():
             hits += 1
-            yrs = sorted(pre[pre["ews_alert"]]["year"].tolist())
-            print(f"  {country} ({info['type']} {onset}): DETECTED persistent ({onset-yrs[0]}yr lead)")
-        elif pre["raw_alert"].any():
-            hits += 1
-            yrs = sorted(pre[pre["raw_alert"]]["year"].tolist())
-            print(f"  {country} ({info['type']} {onset}): DETECTED raw ({onset-yrs[0]}yr lead)")
+            yrs = sorted(pre[pre["combined_alert"]]["year"].tolist())
+            source = "CSD" if pre["ews_alert"].any() else "election"
+            if pre["ews_alert"].any() and pre["election_alert"].any():
+                source = "CSD+election"
+            print(f"  {country} ({info['type']} {onset}): DETECTED via {source} ({onset-yrs[0]}yr lead)")
         else:
-            print(f"  {country} ({info['type']} {onset}): MISSED (csd_max={pre['csd_index'].max():.2f})")
+            print(f"  {country} ({info['type']} {onset}): MISSED (csd={pre['csd_index'].max():.2f}, "
+                  f"elec_vuln={pre['election_vulnerability'].max():.2f})")
 
     sens = hits / total if total > 0 else 0
     print(f"\n  Sensitivity: {hits}/{total} ({sens:.0%})")
@@ -258,7 +360,7 @@ def run_ews():
         for y in range(info["onset"] - LEAD_YEARS, info["onset"] + 1):
             known_w[(c, y)] = True
 
-    alerts = ews_df[ews_df["ews_alert"]]
+    alerts = ews_df[ews_df["combined_alert"]]
     tp = alerts[alerts.apply(lambda r: (r["country_name"], r["year"]) in known_w, axis=1)]
     fp = alerts[~alerts.index.isin(tp.index)]
     prec = len(tp) / len(alerts) if len(alerts) > 0 else 0
@@ -288,8 +390,8 @@ def run_ews():
     )
     valid = ews_eval.dropna(subset=["csd_index"])
     if valid["label"].sum() > 0 and valid["label"].nunique() > 1:
-        auc_roc = roc_auc_score(valid["label"], valid["csd_index"])
-        auc_pr = average_precision_score(valid["label"], valid["csd_index"])
+        auc_roc = roc_auc_score(valid["label"], valid["combined_risk"])
+        auc_pr = average_precision_score(valid["label"], valid["combined_risk"])
         base_rate = valid["label"].mean()
         lift = auc_pr / base_rate
 
@@ -300,16 +402,16 @@ def run_ews():
 
         oos = valid[valid["year"] > TRAIN_CUTOFF]
         if oos["label"].sum() > 0 and oos["label"].nunique() > 1:
-            auc_roc_oos = roc_auc_score(oos["label"], oos["csd_index"])
-            auc_pr_oos = average_precision_score(oos["label"], oos["csd_index"])
+            auc_roc_oos = roc_auc_score(oos["label"], oos["combined_risk"])
+            auc_pr_oos = average_precision_score(oos["label"], oos["combined_risk"])
             print(f"  AUC-ROC (OOS): {auc_roc_oos:.3f}")
             print(f"  AUC-PR (OOS):  {auc_pr_oos:.3f}")
 
         top_pctiles = [99, 95, 90, 80]
         print(f"\n  Risk score calibration:")
         for p in top_pctiles:
-            thresh = valid["csd_index"].quantile(p / 100)
-            flagged = valid[valid["csd_index"] >= thresh]
+            thresh = valid["combined_risk"].quantile(p / 100)
+            flagged = valid[valid["combined_risk"] >= thresh]
             if len(flagged) > 0:
                 prec_at_p = flagged["label"].mean()
                 recall_at_p = flagged["label"].sum() / valid["label"].sum()
@@ -325,10 +427,16 @@ def run_ews():
             continue
         print(f"{country}:")
         for _, r in sub.iterrows():
-            a = " ***" if r["ews_alert"] else ""
+            flags = []
+            if r.get("ews_alert", False):
+                flags.append("CSD")
+            if r.get("election_alert", False):
+                flags.append("ELEC")
+            a = f" *** {'+'.join(flags)}" if flags else ""
             o = "(OOS) " if r["year"] > TRAIN_CUTOFF else ""
-            print(f"  {int(r['year'])} {o}CSD={r['csd_index']:.1f} var_z={r['var_z']:.1f} "
-                  f"ar1_z={r['ar1_z']:.1f} kurt_z={r['kurt_z']:.1f} f={int(r['n_factors'])}/4{a}")
+            ev = r.get("election_vulnerability", 0)
+            print(f"  {int(r['year'])} {o}CSD={r['csd_index']:.1f} elec_vuln={ev:.1f} "
+                  f"var_z={r['var_z']:.1f} ar1_z={r['ar1_z']:.1f} f={int(r['n_factors'])}/9{a}")
         print()
 
     return ews_df

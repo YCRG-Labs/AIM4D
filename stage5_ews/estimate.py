@@ -418,8 +418,25 @@ def run_ews():
 
     ews_df["label"] = ews_df.apply(lambda r: 1 if (r["country_name"], r["year"]) in known_w else 0, axis=1)
 
-    contagion = pd.read_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                         "..", "stage4_nscm", "contagion_scores.csv"))
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    vdem_path = os.path.join(base_dir, "..", "data", "vdem_v16.csv")
+    dsp_cols = ["v2smgovdom", "v2smfordom", "v2smgovfilprc", "v2smgovsmmon", "v2smpardom"]
+    try:
+        vdem_avail = pd.read_csv(vdem_path, low_memory=False, nrows=1).columns
+        dsp_available = [c for c in dsp_cols if c in vdem_avail]
+        if dsp_available:
+            dsp_data = pd.read_csv(vdem_path, low_memory=False,
+                                   usecols=["country_text_id", "year"] + dsp_available)
+            ews_df = ews_df.merge(dsp_data, on=["country_text_id", "year"], how="left")
+            for c in dsp_available:
+                ews_df[c] = ews_df[c].fillna(ews_df[c].median())
+            print(f"  DSP variables loaded: {dsp_available}")
+        else:
+            dsp_available = []
+    except Exception:
+        dsp_available = []
+
+    contagion = pd.read_csv(os.path.join(base_dir, "..", "stage4_nscm", "contagion_scores.csv"))
     if "contagion_score" in contagion.columns:
         ews_df = ews_df.merge(contagion[["country_text_id", "year", "contagion_score"]].rename(
             columns={"contagion_score": "network_exposure"}),
@@ -431,8 +448,15 @@ def run_ews():
         ews_df["csd_x_network"] = 0
 
     meta_features = ["csd_index", "election_vulnerability", "party_threat", "mil_zscore",
-                     "network_exposure", "csd_x_network"]
+                     "network_exposure", "csd_x_network"] + dsp_available
     available_meta = [f for f in meta_features if f in ews_df.columns]
+
+    ews_df["era_post2015"] = (ews_df["year"] > 2015).astype(float)
+    for feat in ["csd_index", "election_vulnerability", "mil_zscore"] + dsp_available:
+        if feat in ews_df.columns:
+            ews_df[f"{feat}_x_post2015"] = ews_df[feat] * ews_df["era_post2015"]
+    era_features = [f"{f}_x_post2015" for f in ["csd_index", "election_vulnerability", "mil_zscore"] + dsp_available if f in ews_df.columns]
+    available_meta = available_meta + [f for f in era_features if f in ews_df.columns]
 
     for feat in available_meta:
         yearly_median = ews_df.groupby("year")[feat].transform("median")
@@ -448,8 +472,13 @@ def run_ews():
     X_meta_scaled = scaler_meta.fit_transform(X_meta)
 
     if y_meta[train_mask].sum() >= 3:
+        half_life = 8
+        max_year = ews_df.loc[train_mask, "year"].max()
+        time_weights = np.exp(-np.log(2) * (max_year - ews_df["year"].values) / half_life)
+
         meta_model = LogisticRegressionCV(cv=3, scoring="average_precision", max_iter=1000, random_state=42)
-        meta_model.fit(X_meta_scaled[train_mask], y_meta[train_mask])
+        meta_model.fit(X_meta_scaled[train_mask], y_meta[train_mask],
+                       sample_weight=time_weights[train_mask])
         ews_df["calibrated_risk"] = meta_model.predict_proba(X_meta_scaled)[:, 1]
 
         coefs = dict(zip(all_meta, meta_model.coef_[0]))

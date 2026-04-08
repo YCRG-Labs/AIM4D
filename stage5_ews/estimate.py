@@ -418,9 +418,29 @@ def run_ews():
 
     ews_df["label"] = ews_df.apply(lambda r: 1 if (r["country_name"], r["year"]) in known_w else 0, axis=1)
 
-    meta_features = ["csd_index", "election_vulnerability", "party_threat", "mil_zscore"]
+    contagion = pd.read_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                         "..", "stage4_nscm", "contagion_scores.csv"))
+    if "contagion_score" in contagion.columns:
+        ews_df = ews_df.merge(contagion[["country_text_id", "year", "contagion_score"]].rename(
+            columns={"contagion_score": "network_exposure"}),
+            on=["country_text_id", "year"], how="left")
+        ews_df["network_exposure"] = ews_df["network_exposure"].fillna(0)
+        ews_df["csd_x_network"] = ews_df["csd_index"] * ews_df["network_exposure"]
+    else:
+        ews_df["network_exposure"] = 0
+        ews_df["csd_x_network"] = 0
+
+    meta_features = ["csd_index", "election_vulnerability", "party_threat", "mil_zscore",
+                     "network_exposure", "csd_x_network"]
     available_meta = [f for f in meta_features if f in ews_df.columns]
-    X_meta = ews_df[available_meta].fillna(0).values
+
+    for feat in available_meta:
+        yearly_median = ews_df.groupby("year")[feat].transform("median")
+        ews_df[f"{feat}_detrended"] = ews_df[feat] - yearly_median
+
+    detrended_features = [f"{f}_detrended" for f in available_meta]
+    all_meta = available_meta + detrended_features
+    X_meta = ews_df[all_meta].fillna(0).values
     y_meta = ews_df["label"].values
     train_mask = ews_df["year"] <= TRAIN_CUTOFF
 
@@ -432,7 +452,7 @@ def run_ews():
         meta_model.fit(X_meta_scaled[train_mask], y_meta[train_mask])
         ews_df["calibrated_risk"] = meta_model.predict_proba(X_meta_scaled)[:, 1]
 
-        coefs = dict(zip(available_meta, meta_model.coef_[0]))
+        coefs = dict(zip(all_meta, meta_model.coef_[0]))
         print(f"  Meta-learner coefficients:")
         for feat, coef in sorted(coefs.items(), key=lambda x: -abs(x[1])):
             print(f"    {feat}: {coef:+.3f}")
@@ -515,7 +535,7 @@ def run_ews():
             mask = (ews_df["country_name"] == held_out_country) & (ews_df["year"] == y)
             train_labels[mask] = 0
 
-        X_loeo = ews_df[available_meta].fillna(0).values
+        X_loeo = ews_df[all_meta].fillna(0).values
         y_loeo = train_labels.values
         loeo_train = (ews_df["year"] <= TRAIN_CUTOFF) | (ews_df["country_name"] != held_out_country)
 

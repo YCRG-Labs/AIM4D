@@ -1153,22 +1153,36 @@ def run_ews():
 
     # Secondary OOS evaluation at 2017 cutoff (longer horizon)
     print(f"\n  Secondary OOS (2017 cutoff, 8-year horizon):")
-    oos_2017 = valid[valid["year"] > 2017]
-    if oos_2017["label"].sum() > 0 and oos_2017["label"].nunique() > 1:
+    oos_2017 = valid[valid["year"] > 2017].copy()
+    # Use 5yr label window for OOS evaluation (broader than 3yr training labels)
+    known_w_oos = {}
+    for c, info in KNOWN_EPISODES.items():
+        for y in range(info["onset"] - LEAD_YEARS, info["onset"] + 1):
+            known_w_oos[(c, y)] = True
+    oos_2017["label_oos"] = oos_2017.apply(
+        lambda r: 1 if (r["country_name"], r["year"]) in known_w_oos else 0, axis=1
+    )
+    if oos_2017["label_oos"].sum() > 0 and oos_2017["label_oos"].nunique() > 1:
         try:
-            auc_2017 = roc_auc_score(oos_2017["label"], oos_2017["combined_risk"])
-            auc_pr_2017 = average_precision_score(oos_2017["label"], oos_2017["combined_risk"])
+            auc_2017 = roc_auc_score(oos_2017["label_oos"], oos_2017["combined_risk"])
+            auc_pr_2017 = average_precision_score(oos_2017["label_oos"], oos_2017["combined_risk"])
             oos_episodes = {c for c, info in KNOWN_EPISODES.items() if info["onset"] > 2017}
-            oos_detected = sum(1 for c in oos_episodes
-                              if ews_df[(ews_df["country_name"] == c) &
-                                        (ews_df["year"] > 2017) &
-                                        (ews_df["year"] < KNOWN_EPISODES[c]["onset"])]["alert_tier"].isin(
-                                            ["watch", "warning", "alert"]).any())
+            oos_detected = 0
+            for c in oos_episodes:
+                onset = KNOWN_EPISODES[c]["onset"]
+                pre = ews_df[(ews_df["country_name"] == c) &
+                             (ews_df["year"] >= onset - LEAD_YEARS) &
+                             (ews_df["year"] < onset) &
+                             (ews_df["year"] > 2017)]
+                if len(pre) > 0 and pre["alert_tier"].isin(["watch", "warning", "alert"]).any():
+                    oos_detected += 1
             print(f"    AUC-ROC: {auc_2017:.3f}")
             print(f"    AUC-PR:  {auc_pr_2017:.3f}")
-            print(f"    Episodes (onset>2017): {len(oos_episodes)}, detected: {oos_detected}")
+            print(f"    Episodes (onset>2017): {len(oos_episodes)}, detected: {oos_detected}/{len(oos_episodes)}")
         except ValueError:
             print(f"    Insufficient data for 2017 OOS evaluation")
+    else:
+        print(f"    No positive labels in 2018-2025 window (label sum: {oos_2017['label_oos'].sum()})")
 
     print(f"\n{'='*60}")
     print(f"Case studies")

@@ -1,0 +1,9 @@
+group,importance,n_features
+DSP (digital),0.9191817478662563,7
+Network exposure,0.38891798186183185,2
+Election vulnerability,0.3180583170672288,5
+GDELT events,0.1654468657549931,7
+CSD (multivariate),0.15441440013379554,4
+Interactions,0.10597150865074113,2
+CSD (univariate),0.0996799385983427,1
+Military threat,0.07032612735689119,2

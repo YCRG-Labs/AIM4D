@@ -1,0 +1,2 @@
+total_alerts,true_positives,false_positives,temporal_near_misses,near_misses,true_false_positives,stable_democracy_fps,standard_precision,adjusted_precision
+3043,85,2958,0,466,2492,533,0.027932960893854747,0.18107131120604666

@@ -567,23 +567,62 @@ def run_ews():
         ews_df["network_exposure"] = 0
         ews_df["csd_x_network"] = 0
 
-    meta_features = ["csd_index", "mv_csd_index", "election_vulnerability", "party_threat",
+    # --- Feature engineering for meta-learner ---
+    base_features = ["csd_index", "mv_csd_index", "election_vulnerability", "party_threat",
                      "mil_zscore", "network_exposure", "csd_x_network"] + dsp_available
-    available_meta = [f for f in meta_features if f in ews_df.columns]
+    available_base = [f for f in base_features if f in ews_df.columns]
 
+    # (1) Lagged features: 1yr and 2yr lags capture trends
+    core_lag_features = ["csd_index", "mv_csd_index", "election_vulnerability", "mil_zscore"]
+    for feat in core_lag_features:
+        if feat in ews_df.columns:
+            ews_df[f"{feat}_lag1"] = ews_df.groupby("country_text_id")[feat].shift(1)
+            ews_df[f"{feat}_lag2"] = ews_df.groupby("country_text_id")[feat].shift(2)
+            ews_df[f"{feat}_delta1"] = ews_df[feat] - ews_df[f"{feat}_lag1"]
+            ews_df[f"{feat}_delta2"] = ews_df[feat] - ews_df[f"{feat}_lag2"]
+
+    lag_features = []
+    for feat in core_lag_features:
+        if feat in ews_df.columns:
+            lag_features += [f"{feat}_lag1", f"{feat}_lag2", f"{feat}_delta1", f"{feat}_delta2"]
+
+    # Era interactions
     ews_df["era_post2015"] = (ews_df["year"] > 2015).astype(float)
+    era_features = []
     for feat in ["csd_index", "election_vulnerability", "mil_zscore"] + dsp_available:
         if feat in ews_df.columns:
             ews_df[f"{feat}_x_post2015"] = ews_df[feat] * ews_df["era_post2015"]
-    era_features = [f"{f}_x_post2015" for f in ["csd_index", "election_vulnerability", "mil_zscore"] + dsp_available if f in ews_df.columns]
-    available_meta = available_meta + [f for f in era_features if f in ews_df.columns]
+            era_features.append(f"{feat}_x_post2015")
 
-    for feat in available_meta:
-        yearly_median = ews_df.groupby("year")[feat].transform("median")
-        ews_df[f"{feat}_detrended"] = ews_df[feat] - yearly_median
+    # Detrended features
+    available_for_detrend = available_base + era_features
+    detrended_features = []
+    for feat in available_for_detrend:
+        if feat in ews_df.columns:
+            yearly_median = ews_df.groupby("year")[feat].transform("median")
+            ews_df[f"{feat}_detrended"] = ews_df[feat] - yearly_median
+            detrended_features.append(f"{feat}_detrended")
 
-    detrended_features = [f"{f}_detrended" for f in available_meta]
-    all_meta = available_meta + detrended_features
+    # Nonlinear interactions for gradient boosting
+    if "csd_index" in ews_df.columns and "election_vulnerability" in ews_df.columns:
+        ews_df["csd_x_election"] = ews_df["csd_index"] * ews_df["election_vulnerability"]
+    if "csd_index" in ews_df.columns and "mil_zscore" in ews_df.columns:
+        ews_df["csd_x_military"] = ews_df["csd_index"] * ews_df["mil_zscore"]
+    interaction_features = [f for f in ["csd_x_election", "csd_x_military"] if f in ews_df.columns]
+
+    all_meta = available_base + lag_features + era_features + detrended_features + interaction_features
+    all_meta = [f for f in all_meta if f in ews_df.columns]
+
+    # (2) Narrower positive window: 3yr before onset (cleaner signal)
+    LABEL_WINDOW = 3
+    known_w_narrow = {}
+    for c, info in KNOWN_EPISODES.items():
+        for y in range(info["onset"] - LABEL_WINDOW, info["onset"] + 1):
+            known_w_narrow[(c, y)] = True
+    ews_df["label"] = ews_df.apply(
+        lambda r: 1 if (r["country_name"], r["year"]) in known_w_narrow else 0, axis=1
+    )
+
     X_meta = ews_df[all_meta].fillna(0).values
     y_meta = ews_df["label"].values
     train_mask = ews_df["year"] <= TRAIN_CUTOFF
@@ -596,28 +635,69 @@ def run_ews():
         max_year = ews_df.loc[train_mask, "year"].max()
         time_weights = np.exp(-np.log(2) * (max_year - ews_df["year"].values) / half_life)
 
-        meta_model = LogisticRegressionCV(cv=3, scoring="average_precision", max_iter=1000, random_state=42)
-        meta_model.fit(X_meta_scaled[train_mask], y_meta[train_mask],
-                       sample_weight=time_weights[train_mask])
-        ews_df["calibrated_risk"] = meta_model.predict_proba(X_meta_scaled)[:, 1]
+        # (3) Elastic net feature selection (L1+L2 to auto-prune noisy features)
+        from sklearn.linear_model import SGDClassifier
+        enet = SGDClassifier(
+            loss="log_loss", penalty="elasticnet", l1_ratio=0.5,
+            alpha=0.001, max_iter=2000, random_state=42, class_weight="balanced",
+        )
+        enet.fit(X_meta_scaled[train_mask], y_meta[train_mask],
+                 sample_weight=time_weights[train_mask])
+        selected_mask = np.abs(enet.coef_[0]) > 1e-4
+        selected_features = [f for f, s in zip(all_meta, selected_mask) if s]
+        n_selected = selected_mask.sum()
+        print(f"  Elastic net selected {n_selected}/{len(all_meta)} features:")
+        for feat, coef in sorted(zip(all_meta, enet.coef_[0]), key=lambda x: -abs(x[1])):
+            if abs(coef) > 1e-4:
+                print(f"    {feat}: {coef:+.4f}")
 
-        coefs = dict(zip(all_meta, meta_model.coef_[0]))
-        print(f"  Meta-learner coefficients:")
-        for feat, coef in sorted(coefs.items(), key=lambda x: -abs(x[1])):
-            print(f"    {feat}: {coef:+.3f}")
+        # Use selected features for final models
+        X_selected = X_meta_scaled[:, selected_mask] if n_selected >= 3 else X_meta_scaled
 
-        # Tiered alerts based on calibrated risk (Ward et al. 2010, ViEWS standard)
+        # (4) Gradient boosting ensemble (captures nonlinear interactions)
+        from sklearn.ensemble import GradientBoostingClassifier
+
+        # Model A: Logistic regression (calibrated probabilities)
+        meta_lr = LogisticRegressionCV(cv=3, scoring="average_precision", max_iter=1000, random_state=42)
+        meta_lr.fit(X_selected[train_mask], y_meta[train_mask],
+                    sample_weight=time_weights[train_mask])
+        lr_risk = meta_lr.predict_proba(X_selected)[:, 1]
+
+        # Model B: Gradient boosting (nonlinear interactions, heavy regularization)
+        meta_gb = GradientBoostingClassifier(
+            n_estimators=100, max_depth=3, learning_rate=0.05,
+            subsample=0.8, min_samples_leaf=20, random_state=42,
+        )
+        meta_gb.fit(X_selected[train_mask], y_meta[train_mask],
+                    sample_weight=time_weights[train_mask])
+        gb_risk = meta_gb.predict_proba(X_selected)[:, 1]
+
+        # Ensemble: average of logistic + gradient boosting
+        ews_df["calibrated_risk"] = 0.5 * lr_risk + 0.5 * gb_risk
+
+        print(f"\n  Ensemble meta-learner (LogisticCV + GradientBoosting):")
+        print(f"    LR component range: [{lr_risk[train_mask].min():.4f}, {lr_risk[train_mask].max():.4f}]")
+        print(f"    GB component range: [{gb_risk[train_mask].min():.4f}, {gb_risk[train_mask].max():.4f}]")
+
+        # GB feature importance
+        if n_selected >= 3:
+            sel_feats = [f for f, s in zip(all_meta, selected_mask) if s]
+            gb_imp = dict(zip(sel_feats, meta_gb.feature_importances_))
+            print(f"  GB feature importance (top 10):")
+            for feat, imp in sorted(gb_imp.items(), key=lambda x: -x[1])[:10]:
+                print(f"    {feat}: {imp:.4f}")
+
+        # Tiered alerts based on calibrated risk
         train_risks = ews_df.loc[train_mask, "calibrated_risk"]
         ews_df["alert_tier"] = "none"
         ews_df.loc[ews_df["calibrated_risk"] >= train_risks.quantile(0.80), "alert_tier"] = "watch"
         ews_df.loc[ews_df["calibrated_risk"] >= train_risks.quantile(0.95), "alert_tier"] = "warning"
         ews_df.loc[ews_df["calibrated_risk"] >= train_risks.quantile(0.98), "alert_tier"] = "alert"
 
-        # Primary alert: calibrated risk threshold (replaces OR-based combined_alert)
         ews_df["combined_alert"] = ews_df["alert_tier"].isin(["warning", "alert"])
 
         tier_counts = ews_df["alert_tier"].value_counts()
-        print(f"\n  Tiered alerts (calibrated risk, Ward et al. 2010):")
+        print(f"\n  Tiered alerts (calibrated risk):")
         for tier in ["alert", "warning", "watch", "none"]:
             print(f"    {tier}: {tier_counts.get(tier, 0)} ({tier_counts.get(tier, 0)/len(ews_df)*100:.1f}%)")
     else:
@@ -743,6 +823,7 @@ def run_ews():
     print(f"{'='*60}\n")
 
     from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import GradientBoostingClassifier
 
     loeo_results_by_tier = {"alert": 0, "warning": 0, "watch": 0}
     loeo_total = 0
@@ -763,8 +844,17 @@ def run_ews():
         if y_loeo[loeo_train].sum() >= 3:
             scaler_loeo = SS()
             X_scaled = scaler_loeo.fit_transform(X_loeo)
-            loeo_model = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
-            loeo_model.fit(X_scaled[loeo_train], y_loeo[loeo_train])
+
+            # Same ensemble as main model: LR + GB
+            loeo_lr = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
+            loeo_lr.fit(X_scaled[loeo_train], y_loeo[loeo_train],
+                        sample_weight=time_weights[loeo_train])
+            loeo_gb = GradientBoostingClassifier(
+                n_estimators=100, max_depth=3, learning_rate=0.05,
+                subsample=0.8, min_samples_leaf=20, random_state=42,
+            )
+            loeo_gb.fit(X_scaled[loeo_train], y_loeo[loeo_train],
+                        sample_weight=time_weights[loeo_train])
 
             pre = ews_df[(ews_df["country_name"] == held_out_country) &
                          (ews_df["year"] >= held_out_onset - LEAD_YEARS) &
@@ -773,9 +863,11 @@ def run_ews():
             if len(pre) > 0:
                 loeo_total += 1
                 pre_idx = pre.index
-                pre_risk = loeo_model.predict_proba(X_scaled[pre_idx])[:, 1]
+                pre_risk = 0.5 * loeo_lr.predict_proba(X_scaled[pre_idx])[:, 1] + \
+                           0.5 * loeo_gb.predict_proba(X_scaled[pre_idx])[:, 1]
                 max_risk = pre_risk.max()
-                train_preds = loeo_model.predict_proba(X_scaled[loeo_train])[:, 1]
+                train_preds = 0.5 * loeo_lr.predict_proba(X_scaled[loeo_train])[:, 1] + \
+                              0.5 * loeo_gb.predict_proba(X_scaled[loeo_train])[:, 1]
 
                 # Evaluate at all three tiers
                 thresh_alert = np.percentile(train_preds, 98)

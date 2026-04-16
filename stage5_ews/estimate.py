@@ -1040,6 +1040,27 @@ def run_ews():
     print(f"    Alert (P98):   {loeo_alert}/{loeo_total} ({loeo_alert/loeo_total:.0%})" if loeo_total > 0 else "")
     print(f"  (Each episode predicted without seeing itself)")
 
+    # LOEO stratified by episode type
+    print(f"\n  LOEO stratified by episode type:")
+    for ep_type in ["backsliding", "coup"]:
+        type_risks = [r for r in loeo_risks
+                      if KNOWN_EPISODES.get(r["country"], {}).get("type") == ep_type]
+        if type_risks:
+            type_detected = sum(1 for r in type_risks if r["tier"] in ["watch", "warning", "alert"])
+            type_total = len(type_risks)
+            print(f"    {ep_type}: {type_detected}/{type_total} ({type_detected/type_total:.0%})")
+
+    # LOEO stratified by onset era
+    print(f"\n  LOEO stratified by onset era:")
+    for era_label, era_start, era_end in [("pre-2005", 0, 2004), ("2005-2014", 2005, 2014),
+                                           ("2015-2021", 2015, 2021), ("post-2021", 2022, 2030)]:
+        era_risks = [r for r in loeo_risks
+                     if era_start <= KNOWN_EPISODES.get(r["country"], {}).get("onset", 0) <= era_end]
+        if era_risks:
+            era_detected = sum(1 for r in era_risks if r["tier"] in ["watch", "warning", "alert"])
+            era_total = len(era_risks)
+            print(f"    {era_label}: {era_detected}/{era_total} ({era_detected/era_total:.0%})")
+
     print(f"\n{'='*60}")
     print(f"Continuous risk score evaluation (AUC)")
     print(f"{'='*60}\n")
@@ -1129,6 +1150,25 @@ def run_ews():
         print(f"\n  Mean AUC across windows: {mean_auc:.3f} +/- {std_auc:.3f}")
         print(f"  Mean detection rate: {np.mean(window_detections):.0%}")
         print(f"  (This is the robust generalization estimate across 6 temporal windows)")
+
+    # Secondary OOS evaluation at 2017 cutoff (longer horizon)
+    print(f"\n  Secondary OOS (2017 cutoff, 8-year horizon):")
+    oos_2017 = valid[valid["year"] > 2017]
+    if oos_2017["label"].sum() > 0 and oos_2017["label"].nunique() > 1:
+        try:
+            auc_2017 = roc_auc_score(oos_2017["label"], oos_2017["combined_risk"])
+            auc_pr_2017 = average_precision_score(oos_2017["label"], oos_2017["combined_risk"])
+            oos_episodes = {c for c, info in KNOWN_EPISODES.items() if info["onset"] > 2017}
+            oos_detected = sum(1 for c in oos_episodes
+                              if ews_df[(ews_df["country_name"] == c) &
+                                        (ews_df["year"] > 2017) &
+                                        (ews_df["year"] < KNOWN_EPISODES[c]["onset"])]["alert_tier"].isin(
+                                            ["watch", "warning", "alert"]).any())
+            print(f"    AUC-ROC: {auc_2017:.3f}")
+            print(f"    AUC-PR:  {auc_pr_2017:.3f}")
+            print(f"    Episodes (onset>2017): {len(oos_episodes)}, detected: {oos_detected}")
+        except ValueError:
+            print(f"    Insufficient data for 2017 OOS evaluation")
 
     print(f"\n{'='*60}")
     print(f"Case studies")

@@ -637,21 +637,33 @@ def run_ews():
         ews_df["csd_x_military"] = ews_df["csd_index"] * ews_df["mil_zscore"]
     interaction_features = [f for f in ["csd_x_election", "csd_x_military"] if f in ews_df.columns]
 
-    all_meta = available_base + lag_features + era_features + detrended_features + interaction_features
+    # (2) Country-percentile features: relative risk within each country's history
+    for feat in ["csd_index", "mv_csd_index", "election_vulnerability"]:
+        if feat in ews_df.columns:
+            ews_df[f"{feat}_pctile"] = ews_df.groupby("country_text_id")[feat].rank(pct=True)
+    pctile_features = [f"{f}_pctile" for f in ["csd_index", "mv_csd_index", "election_vulnerability"]
+                       if f"{f}_pctile" in ews_df.columns]
+
+    all_meta = available_base + lag_features + pctile_features + era_features + detrended_features + interaction_features
     all_meta = [f for f in all_meta if f in ews_df.columns]
 
-    # (2) Narrower positive window: 3yr before onset (cleaner signal)
-    LABEL_WINDOW = 3
-    known_w_narrow = {}
+    # (2b) Soft distance-weighted labels (exponential decay from onset)
+    # Years closer to onset get higher weight, captures proximity gradient
+    label_decay = 2.0  # half-life in years
+    known_w_soft = {}
     for c, info in KNOWN_EPISODES.items():
-        for y in range(info["onset"] - LABEL_WINDOW, info["onset"] + 1):
-            known_w_narrow[(c, y)] = True
-    ews_df["label"] = ews_df.apply(
-        lambda r: 1 if (r["country_name"], r["year"]) in known_w_narrow else 0, axis=1
+        for y in range(info["onset"] - LEAD_YEARS, info["onset"] + 1):
+            dist = max(0, info["onset"] - y)
+            known_w_soft[(c, y)] = np.exp(-dist / label_decay)
+    ews_df["label_soft"] = ews_df.apply(
+        lambda r: known_w_soft.get((r["country_name"], r["year"]), 0.0), axis=1
     )
+    # Binary label for evaluation (any nonzero soft label)
+    ews_df["label"] = (ews_df["label_soft"] > 0.05).astype(int)
 
     X_meta = ews_df[all_meta].fillna(0).values
-    y_meta = ews_df["label"].values
+    y_meta = ews_df["label"].values  # binary for classifiers
+    y_meta_soft = ews_df["label_soft"].values  # soft for sample weighting
     train_mask = ews_df["year"] <= TRAIN_CUTOFF
 
     scaler_meta = SS()
@@ -661,6 +673,7 @@ def run_ews():
         half_life = 8
         max_year = ews_df.loc[train_mask, "year"].max()
         time_weights = np.exp(-np.log(2) * (max_year - ews_df["year"].values) / half_life)
+        # No proximity boost — soft labels captured via percentile features instead
 
         # (3) Elastic net feature selection (L1+L2 to auto-prune noisy features)
         from sklearn.linear_model import SGDClassifier

@@ -15,6 +15,8 @@ Z_CAP = 10.0
 MIN_ABS_VAR_PCTL = 0.30
 PERSISTENCE = 2
 LEAD_YEARS = 5
+N_SURROGATES = 50  # Reduced for speed; 200 for final paper runs
+KENDALL_SIG = 0.05
 
 KNOWN_EPISODES = {
     "Hungary": {"onset": 2010, "peak": 2018, "type": "backsliding"},
@@ -142,6 +144,84 @@ def persistence_filter(alerts, min_c=PERSISTENCE):
         else:
             cnt = 0
     return out
+
+
+def multivariate_csd(resid_matrix, window=WINDOW, min_w=MIN_WINDOW):
+    """
+    Multivariate CSD indicators (Weinans et al. 2021, Held & Kleinen 2004).
+    Tracks dominant eigenvalue of cross-factor covariance and mean cross-correlation
+    in a rolling window — captures correlated fluctuations across factors.
+    """
+    n, d = resid_matrix.shape
+    dom_eig = np.full(n, np.nan)
+    mean_xcorr = np.full(n, np.nan)
+    total_var = np.full(n, np.nan)
+
+    for t in range(min_w, n):
+        start = max(0, t - window)
+        chunk = resid_matrix[start:t + 1]
+        valid = ~np.any(np.isnan(chunk), axis=1)
+        chunk = chunk[valid]
+        if len(chunk) < min_w or chunk.shape[1] < 2:
+            continue
+
+        cov = np.cov(chunk.T)
+        if cov.ndim < 2:
+            continue
+
+        eigvals = np.linalg.eigvalsh(cov)
+        dom_eig[t] = eigvals[-1]
+        total_var[t] = np.trace(cov)
+
+        # Mean absolute cross-correlation
+        stds = np.std(chunk, axis=0, ddof=1)
+        stds = np.maximum(stds, 1e-10)
+        corr = cov / np.outer(stds, stds)
+        np.fill_diagonal(corr, 0)
+        n_pairs = d * (d - 1)
+        mean_xcorr[t] = np.sum(np.abs(corr)) / n_pairs if n_pairs > 0 else 0
+
+    return dom_eig, mean_xcorr, total_var
+
+
+def kendall_tau_with_surrogates(series, window=WINDOW, n_surrogates=N_SURROGATES):
+    """
+    Kendall tau trend test with ARMA surrogate significance (Dakos et al. 2012).
+    Returns tau values and boolean significance at each time step.
+    """
+    n = len(series)
+    taus = np.full(n, np.nan)
+    significant = np.zeros(n, dtype=bool)
+
+    for t in range(MIN_WINDOW, n):
+        start = max(0, t - window)
+        c = series[start:t + 1]
+        valid = ~np.isnan(c)
+        c_valid = c[valid]
+        if len(c_valid) < 4:
+            continue
+
+        tau, _ = stats.kendalltau(np.arange(len(c_valid)), c_valid)
+        taus[t] = tau
+
+        # ARMA(1) surrogates: generate series with same AR(1) + variance
+        if len(c_valid) >= 5:
+            ar1 = np.corrcoef(c_valid[:-1], c_valid[1:])[0, 1] if np.std(c_valid) > 1e-10 else 0
+            ar1 = np.clip(ar1, -0.99, 0.99)
+            residual_std = np.std(c_valid) * np.sqrt(1 - ar1 ** 2) if abs(ar1) < 1 else np.std(c_valid)
+
+            surr_taus = np.zeros(n_surrogates)
+            for s in range(n_surrogates):
+                surr = np.zeros(len(c_valid))
+                surr[0] = np.random.normal(0, np.std(c_valid))
+                for i in range(1, len(surr)):
+                    surr[i] = ar1 * surr[i - 1] + np.random.normal(0, max(residual_std, 1e-10))
+                surr_taus[s], _ = stats.kendalltau(np.arange(len(surr)), surr)
+
+            p_value = np.mean(surr_taus >= tau) if tau > 0 else 1.0
+            significant[t] = p_value < KENDALL_SIG
+
+    return taus, significant
 
 
 def compute_election_vulnerability():
@@ -282,19 +362,50 @@ def run_ews():
                 if np.isnan(max_abs[t]) or (not np.isnan(rv[t]) and rv[t] > max_abs[t]):
                     max_abs[t] = rv[t]
 
+        # --- Multivariate CSD (Weinans et al. 2021, Held & Kleinen 2004) ---
+        factor_resid_cols = [f"resid_factor_{k+1}" for k in range(4)]
+        available_fc = [c for c in factor_resid_cols if c in cdf.columns]
+        resid_matrix = cdf[available_fc].values if available_fc else np.zeros((len(years), 1))
+
+        dom_eig, mean_xcorr, total_var = multivariate_csd(resid_matrix)
+
+        # Kendall tau with surrogate significance for multivariate indicators
+        eig_tau, eig_sig = kendall_tau_with_surrogates(dom_eig)
+        xcorr_tau, xcorr_sig = kendall_tau_with_surrogates(mean_xcorr)
+        var_tau_mv, var_sig = kendall_tau_with_surrogates(total_var)
+
+        # Z-scores for multivariate indicators
+        eig_z = country_z(dom_eig, years)
+        xcorr_z = country_z(mean_xcorr, years)
+
+        # Multivariate CSD alert: significant upward trend in eigenvalue OR cross-correlation
+        mv_csd_alert = eig_sig | xcorr_sig | var_sig
+
+        # --- Enhanced CSD index combining univariate and multivariate ---
         csd_idx = np.zeros(len(years))
         for t in range(len(years)):
+            components = []
+            # Univariate components (original)
             if not np.isnan(max_abs[t]) and max_abs[t] > abs_var_floor:
-                c = []
                 for m in ["var_z", "ar1_z", "kurt_z"]:
                     if not np.isnan(best[m][t]):
-                        c.append(min(Z_CAP, max(0, best[m][t])))
+                        components.append(min(Z_CAP, max(0, best[m][t])))
                 for m in ["var_tau", "ar1_tau"]:
                     if not np.isnan(best[m][t]):
-                        c.append(max(0, best[m][t]) * 2)
-                csd_idx[t] = np.mean(c) if c else 0
+                        components.append(max(0, best[m][t]) * 2)
+            # Multivariate components (new)
+            if not np.isnan(eig_z[t]):
+                components.append(min(Z_CAP, max(0, eig_z[t])))
+            if not np.isnan(xcorr_z[t]):
+                components.append(min(Z_CAP, max(0, xcorr_z[t])))
+            if not np.isnan(eig_tau[t]):
+                components.append(max(0, eig_tau[t]) * 3)  # Weight tau higher for significance
+            csd_idx[t] = np.mean(components) if components else 0
 
-        raw = (factor_alerts >= 3) | ((factor_alerts >= 2) & (csd_idx > 2.5)) | ((factor_alerts >= 1) & (csd_idx > 4.0))
+        # --- Relaxed alert: univariate OR multivariate CSD ---
+        raw_univariate = (factor_alerts >= 3) | ((factor_alerts >= 2) & (csd_idx > 2.5)) | ((factor_alerts >= 1) & (csd_idx > 4.0))
+        raw_multivariate = mv_csd_alert & (csd_idx > 1.5)
+        raw = raw_univariate | raw_multivariate
         persistent = persistence_filter(raw)
 
         for t in range(len(years)):
@@ -304,6 +415,9 @@ def run_ews():
                 "var_z": best["var_z"][t], "ar1_z": best["ar1_z"][t], "kurt_z": best["kurt_z"][t],
                 "var_trend": best["var_tau"][t], "ar1_trend": best["ar1_tau"][t],
                 "n_factors": factor_alerts[t], "csd_index": csd_idx[t],
+                "dom_eig_z": eig_z[t], "xcorr_z": xcorr_z[t],
+                "eig_trend_sig": eig_sig[t], "xcorr_trend_sig": xcorr_sig[t],
+                "mv_csd_alert": mv_csd_alert[t],
                 "raw_alert": raw[t], "ews_alert": persistent[t],
             })
 
@@ -402,7 +516,8 @@ def run_ews():
         else:
             print(f"  {country}: no military threat alert")
 
-    ews_df["combined_alert"] = ews_df["ews_alert"] | ews_df["election_alert"] | ews_df["dem_vulnerability_alert"] | ews_df["military_threat_alert"]
+    # Legacy OR-based alert (kept for backwards compatibility, NOT primary metric)
+    ews_df["combined_alert_legacy"] = ews_df["ews_alert"] | ews_df["election_alert"] | ews_df["dem_vulnerability_alert"] | ews_df["military_threat_alert"]
 
     print(f"\n{'='*60}")
     print(f"Meta-learner calibration")
@@ -486,20 +601,39 @@ def run_ews():
         for feat, coef in sorted(coefs.items(), key=lambda x: -abs(x[1])):
             print(f"    {feat}: {coef:+.3f}")
 
-        ews_df["meta_alert"] = ews_df["calibrated_risk"] > ews_df[train_mask]["calibrated_risk"].quantile(0.95)
-        ews_df["combined_alert"] = ews_df["combined_alert"] | ews_df["meta_alert"]
-        print(f"  Meta-learner alerts (p95): {ews_df['meta_alert'].sum()}")
+        # Tiered alerts based on calibrated risk (Ward et al. 2010, ViEWS standard)
+        train_risks = ews_df.loc[train_mask, "calibrated_risk"]
+        ews_df["alert_tier"] = "none"
+        ews_df.loc[ews_df["calibrated_risk"] >= train_risks.quantile(0.80), "alert_tier"] = "watch"
+        ews_df.loc[ews_df["calibrated_risk"] >= train_risks.quantile(0.95), "alert_tier"] = "warning"
+        ews_df.loc[ews_df["calibrated_risk"] >= train_risks.quantile(0.98), "alert_tier"] = "alert"
+
+        # Primary alert: calibrated risk threshold (replaces OR-based combined_alert)
+        ews_df["combined_alert"] = ews_df["alert_tier"].isin(["warning", "alert"])
+
+        tier_counts = ews_df["alert_tier"].value_counts()
+        print(f"\n  Tiered alerts (calibrated risk, Ward et al. 2010):")
+        for tier in ["alert", "warning", "watch", "none"]:
+            print(f"    {tier}: {tier_counts.get(tier, 0)} ({tier_counts.get(tier, 0)/len(ews_df)*100:.1f}%)")
     else:
         ews_df["calibrated_risk"] = ews_df["csd_index"]
+        ews_df["alert_tier"] = "none"
+        ews_df["combined_alert"] = ews_df["ews_alert"]
         print(f"  Insufficient positive examples for meta-learner, using CSD index")
 
     ews_df["combined_risk"] = ews_df["calibrated_risk"] if "calibrated_risk" in ews_df.columns else ews_df["csd_index"]
 
     print(f"\n{'='*60}")
-    print(f"Validation (CSD + election combined)")
+    print(f"Validation: episode detection + precision@K")
     print(f"{'='*60}\n")
 
-    hits = 0
+    known_w = {}
+    for c, info in KNOWN_EPISODES.items():
+        for y in range(info["onset"] - LEAD_YEARS, info["onset"] + 1):
+            known_w[(c, y)] = True
+
+    # Episode detection by tier
+    hits_by_tier = {"watch": 0, "warning": 0, "alert": 0}
     total = 0
     for country, info in KNOWN_EPISODES.items():
         onset = info["onset"]
@@ -509,42 +643,95 @@ def run_ews():
             print(f"  {country} ({onset}): NO DATA")
             continue
         total += 1
-        if pre["combined_alert"].any():
-            hits += 1
-            yrs = sorted(pre[pre["combined_alert"]]["year"].tolist())
-            source = "CSD" if pre["ews_alert"].any() else "election"
-            if pre["ews_alert"].any() and pre["election_alert"].any():
-                source = "CSD+election"
-            print(f"  {country} ({info['type']} {onset}): DETECTED via {source} ({onset-yrs[0]}yr lead)")
+        max_risk = pre["combined_risk"].max()
+        best_tier = "none"
+        for tier in ["alert", "warning", "watch"]:
+            if (pre["alert_tier"] == tier).any():
+                best_tier = tier
+                break
+        if best_tier != "none":
+            hits_by_tier[best_tier] += 1
+            for lower in ["warning", "watch"]:
+                if lower != best_tier:
+                    hits_by_tier[lower] += 0  # already counted
+        detected = best_tier != "none"
+
+        source = []
+        if pre["ews_alert"].any(): source.append("CSD")
+        if pre.get("mv_csd_alert", pd.Series(False)).any(): source.append("mvCSD")
+        if pre.get("election_alert", pd.Series(False)).any(): source.append("ELEC")
+        source_str = "+".join(source) if source else "meta-only"
+
+        if detected:
+            yrs = sorted(pre[pre["alert_tier"] != "none"]["year"].tolist())
+            lead = onset - yrs[0] if yrs else 0
+            print(f"  {country} ({info['type']} {onset}): DETECTED [{best_tier}] via {source_str} ({lead}yr lead, risk={max_risk:.3f})")
         else:
-            print(f"  {country} ({info['type']} {onset}): MISSED (csd={pre['csd_index'].max():.2f}, "
-                  f"elec_vuln={pre['election_vulnerability'].max():.2f})")
+            print(f"  {country} ({info['type']} {onset}): MISSED (risk={max_risk:.3f})")
 
-    sens = hits / total if total > 0 else 0
-    print(f"\n  Sensitivity: {hits}/{total} ({sens:.0%})")
+    # Cumulative detection by tier
+    cum_watch = sum(1 for c, info in KNOWN_EPISODES.items()
+                    if ews_df[(ews_df["country_name"] == c) &
+                              (ews_df["year"] >= info["onset"] - LEAD_YEARS) &
+                              (ews_df["year"] < info["onset"])]["alert_tier"].isin(["watch", "warning", "alert"]).any()
+                    and len(ews_df[(ews_df["country_name"] == c) & (ews_df["year"] >= info["onset"] - LEAD_YEARS)]) > 0)
+    cum_warning = sum(1 for c, info in KNOWN_EPISODES.items()
+                      if ews_df[(ews_df["country_name"] == c) &
+                                (ews_df["year"] >= info["onset"] - LEAD_YEARS) &
+                                (ews_df["year"] < info["onset"])]["alert_tier"].isin(["warning", "alert"]).any()
+                      and len(ews_df[(ews_df["country_name"] == c) & (ews_df["year"] >= info["onset"] - LEAD_YEARS)]) > 0)
+    cum_alert = sum(1 for c, info in KNOWN_EPISODES.items()
+                    if ews_df[(ews_df["country_name"] == c) &
+                              (ews_df["year"] >= info["onset"] - LEAD_YEARS) &
+                              (ews_df["year"] < info["onset"])]["alert_tier"].isin(["alert"]).any()
+                    and len(ews_df[(ews_df["country_name"] == c) & (ews_df["year"] >= info["onset"] - LEAD_YEARS)]) > 0)
 
-    known_w = {}
-    for c, info in KNOWN_EPISODES.items():
-        for y in range(info["onset"] - LEAD_YEARS, info["onset"] + 1):
-            known_w[(c, y)] = True
+    print(f"\n  Detection by tier (cumulative):")
+    print(f"    Watch (top 20%):  {cum_watch}/{total}")
+    print(f"    Warning (top 5%): {cum_warning}/{total}")
+    print(f"    Alert (top 2%):   {cum_alert}/{total}")
 
+    # Precision@K (Blair & Sambanis 2020, Ward et al. 2010)
+    # Use country-level max risk (standard: "top K countries most at risk")
+    print(f"\n  Precision@K (country-level ranked risk list):")
+    ews_df["label"] = ews_df.apply(lambda r: 1 if (r["country_name"], r["year"]) in known_w else 0, axis=1)
+    valid = ews_df.dropna(subset=["combined_risk"])
+
+    country_max_risk = valid.groupby("country_name").agg(
+        max_risk=("combined_risk", "max"),
+        any_positive=("label", "max"),
+    ).reset_index()
+    country_max_risk = country_max_risk.sort_values("max_risk", ascending=False)
+    n_positive_countries = country_max_risk["any_positive"].sum()
+
+    for K in [5, 10, 20, 50]:
+        top_k = country_max_risk.head(K)
+        prec_k = top_k["any_positive"].mean()
+        recall_k = top_k["any_positive"].sum() / n_positive_countries if n_positive_countries > 0 else 0
+        base_rate = country_max_risk["any_positive"].mean()
+        lift_k = prec_k / base_rate if base_rate > 0 else 0
+        print(f"    @{K:3d}: precision={prec_k:.1%}, recall={recall_k:.1%}, lift={lift_k:.1f}x")
+
+    # Standard precision/recall on tiered alerts
     alerts = ews_df[ews_df["combined_alert"]]
-    tp = alerts[alerts.apply(lambda r: (r["country_name"], r["year"]) in known_w, axis=1)]
-    fp = alerts[~alerts.index.isin(tp.index)]
+    tp = alerts[alerts["label"] == 1]
+    fp = alerts[alerts["label"] == 0]
     prec = len(tp) / len(alerts) if len(alerts) > 0 else 0
+    sens = cum_warning / total if total > 0 else 0
     fp_rate = len(fp) / len(ews_df)
 
-    print(f"\n  Alerts: {len(alerts)} / {len(ews_df)} ({len(alerts)/len(ews_df):.1%})")
-    print(f"  TP: {len(tp)}, FP: {len(fp)} ({fp_rate:.1%})")
-    print(f"  Precision: {prec:.1%}")
+    print(f"\n  Warning-tier performance:")
+    print(f"    Alerts: {len(alerts)} / {len(ews_df)} ({len(alerts)/len(ews_df):.1%})")
+    print(f"    Precision: {prec:.1%}")
+    print(f"    Sensitivity: {cum_warning}/{total} ({sens:.0%})")
     if sens > 0 and prec > 0:
-        print(f"  F1: {2*prec*sens/(prec+sens):.3f}")
+        print(f"    F1: {2*prec*sens/(prec+sens):.3f}")
 
     stable = ["Denmark", "Sweden", "Norway", "Switzerland", "Finland",
               "Germany", "Canada", "New Zealand", "Uruguay", "Belgium",
               "Iceland", "Australia", "Ireland", "Netherlands"]
     sfp = fp[fp["country_name"].isin(stable)]
-    print(f"  Stable democracy FPs: {len(sfp)}")
+    print(f"    Stable democracy FPs: {len(sfp)}")
 
     print(f"\n{'='*60}")
     print(f"Leave-one-episode-out cross-validation")
@@ -586,17 +773,13 @@ def run_ews():
                 threshold = np.percentile(loeo_model.predict_proba(X_scaled[loeo_train])[:, 1], 95)
                 detected = max_risk > threshold
 
-                csd_detected = pre["ews_alert"].any()
-                elec_detected = pre.get("election_alert", pd.Series(False)).any() if "election_alert" in pre.columns else False
-
-                if detected or csd_detected or elec_detected:
+                if detected:
                     loeo_hits += 1
-                    source = "meta" if detected else ("CSD" if csd_detected else "election")
-                    print(f"  {held_out_country}: DETECTED (LOEO, via {source}, risk={max_risk:.3f})")
+                    print(f"  {held_out_country}: DETECTED (LOEO, risk={max_risk:.3f}, thresh={threshold:.3f})")
                 else:
-                    print(f"  {held_out_country}: MISSED (LOEO, max_risk={max_risk:.3f}, thresh={threshold:.3f})")
+                    print(f"  {held_out_country}: MISSED (LOEO, risk={max_risk:.3f}, thresh={threshold:.3f})")
 
-                loeo_risks.append({"country": held_out_country, "max_risk": max_risk, "detected": detected or csd_detected or elec_detected})
+                loeo_risks.append({"country": held_out_country, "max_risk": max_risk, "detected": detected})
 
     loeo_sens = loeo_hits / loeo_total if loeo_total > 0 else 0
     print(f"\n  LOEO Sensitivity: {loeo_hits}/{loeo_total} ({loeo_sens:.0%})")

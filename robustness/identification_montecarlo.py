@@ -80,14 +80,17 @@ def simulate(N, T, alpha, W, seed, violate=None, burn=20):
     for t in range(1, T + burn):
         F[t] = Phi @ F[t - 1] + rng.standard_normal(K_FACTORS)
     beta = rng.standard_normal((N, K_FACTORS))
-    # Markov regime states
+    # Markov regime states — vectorized across countries via inverse-CDF
+    # sampling (was a per-(country,timestep) rng.choice loop = the bottleneck).
     P = np.full((N_STATES, N_STATES), 2.0)
     np.fill_diagonal(P, 50.0)
     P = P / P.sum(axis=1, keepdims=True)
+    Pcum = np.cumsum(P, axis=1)
     S = np.zeros((N, T + burn), dtype=int)
-    for i in range(N):
-        for t in range(1, T + burn):
-            S[i, t] = rng.choice(N_STATES, p=P[S[i, t - 1]])
+    for t in range(1, T + burn):
+        u = rng.random(N)
+        nxt = (u[:, None] > Pcum[S[:, t - 1]]).sum(axis=1)
+        S[:, t] = np.minimum(nxt, N_STATES - 1)
     gamma = np.array([2.0, 1.0, 0.0, -1.0, -2.0])
     sigma = 1.0
     eps = rng.normal(0, sigma, (N, T + burn))

@@ -70,10 +70,12 @@ def load_fh():
     try:
         import country_converter as coco
         cc = coco.CountryConverter()
-        fh["country_text_id"] = cc.convert(names=fh["country"].tolist(),
-                                            to="ISO3", not_found=None)
+        mapped = cc.convert(names=fh["country"].tolist(), to="ISO3", not_found=None)
     except ImportError:
         sys.exit("Need country_converter: pip install country_converter")
+    # coco returns a LIST for ambiguous multi-match names and None for
+    # unmatched — both are unusable as merge keys. Keep only clean strings.
+    fh["country_text_id"] = [m if isinstance(m, str) else None for m in mapped]
     fh = fh.dropna(subset=["country_text_id"])
     return fh, subq
 

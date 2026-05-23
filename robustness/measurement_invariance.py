@@ -106,6 +106,19 @@ def main():
     print(f"FH: {len(fh)} rows, {len(fh_cols)} subquestions")
     print(f"Polity5: {len(pol)} rows, {len(pol_cols)} components")
 
+    # Bulletproof the merge keys: coerce country_text_id to clean strings and
+    # year to int in BOTH frames, dropping anything non-scalar. country_converter
+    # can emit a list for ambiguous multi-match names, which poisons the merge
+    # with 'unhashable type: list' no matter which frame it lands in.
+    for d in (fh, pol):
+        d["country_text_id"] = [c if isinstance(c, str) else None
+                                for c in d["country_text_id"]]
+        d["year"] = pd.to_numeric(d["year"], errors="coerce")
+    fh = fh.dropna(subset=["country_text_id", "year"]).copy()
+    pol = pol.dropna(subset=["country_text_id", "year"]).copy()
+    fh["year"] = fh["year"].astype(int)
+    pol["year"] = pol["year"].astype(int)
+
     # Merge FH + Polity on (country_text_id, year), restrict to overlap window
     merged = fh.merge(pol, on=["country_text_id", "year"], how="inner",
                       suffixes=("_fh", "_pol"))

@@ -27,9 +27,26 @@ import pandas as pd
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 from stage1_factors.extract import (  # noqa: E402
-    load_vdem, select_indicators, build_panel, panel_to_matrix, poet_estimate,
+    load_vdem, select_indicators, build_panel, panel_to_matrix, varimax,
     bai_ng_ic,
 )
+from scipy import linalg as sla  # noqa: E402
+
+
+def fast_factors(X, K):
+    """Loadings + factor scores ONLY (eigendecomp + varimax). Skips the
+    O(P^2) POET sparse-covariance thresholding, which the jackknife never
+    uses — it only compares loadings/scores. ~100x faster than poet_estimate
+    on a 330-indicator panel."""
+    N = X.shape[0]
+    cov = X.T @ X / N
+    eigvals, eigvecs = sla.eigh(cov)
+    idx = np.argsort(eigvals)[::-1]
+    eigvals, eigvecs = eigvals[idx], eigvecs[:, idx]
+    raw = eigvecs[:, :K] * np.sqrt(np.maximum(eigvals[:K], 0))[None, :]
+    rot, _ = varimax(raw)
+    factors = X @ np.linalg.lstsq(rot.T @ rot, rot.T, rcond=None)[0].T
+    return rot, factors
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "factor_jackknife.csv")
 K = 4
@@ -58,22 +75,41 @@ def tucker_congruence(a, b):
     return float(abs(a @ b) / denom)
 
 
-def run_poet(df, indicators):
-    """Run POET on a given indicator subset; return (loadings_df, factor1_series)."""
-    panel = build_panel(df, indicators)
-    if len(panel) < 100 or len(indicators) < 8:
-        return None, None
-    X, _ = panel_to_matrix(panel, indicators)
-    res = poet_estimate(X, K)
-    loadings = pd.DataFrame(res["loadings"], index=indicators,
+_PANEL_CACHE = {}  # full interpolated panel, built once
+
+
+def _cached_panel(df, indicators):
+    """Build the fully-interpolated panel ONCE over all indicators and cache it.
+    Jackknife configs then subset columns from this without re-interpolating
+    (per-column interpolation is independent, so the cached values are valid
+    for any column subset)."""
+    key = "full"
+    if key not in _PANEL_CACHE:
+        _PANEL_CACHE[key] = build_panel(df, indicators)
+    return _PANEL_CACHE[key]
+
+
+def run_poet(df, indicators, want_K=False, full_indicators=None):
+    """Fast factor extraction on an indicator subset, reusing the cached
+    interpolated panel. Returns (loadings_df, factor_scores_df[, K_selected])."""
+    if len(indicators) < 8:
+        return (None, None, np.nan) if want_K else (None, None)
+    panel = _cached_panel(df, full_indicators if full_indicators is not None else indicators)
+    sub = panel[["country_name", "year"] + indicators]
+    from sklearn.preprocessing import StandardScaler
+    X = StandardScaler().fit_transform(sub[indicators].values)
+    rot, factors = fast_factors(X, K)
+    loadings = pd.DataFrame(rot, index=indicators,
                             columns=[f"f{i+1}" for i in range(K)])
-    # Factor-1 scores keyed by (country, year)
     f_scores = pd.DataFrame({
-        "country_name": panel["country_name"].values,
-        "year": panel["year"].values,
+        "country_name": sub["country_name"].values,
+        "year": sub["year"].values,
     })
     for i in range(K):
-        f_scores[f"f{i+1}"] = res["factors"][:, i]
+        f_scores[f"f{i+1}"] = factors[:, i]
+    if want_K:
+        ic, _, _ = bai_ng_ic(X)
+        return loadings, f_scores, ic[2]
     return loadings, f_scores
 
 
@@ -86,17 +122,20 @@ def procrustes_align(L0_shared, Lr):
     return R
 
 
-def compare_to_base(base_loadings, base_f1, indicators_kept, df):
-    """Refit on indicators_kept, align, return (phi, score_r, K_selected)."""
-    loadings_r, fscores_r = run_poet(df, indicators_kept)
+def compare_to_base(base_loadings, base_f1, indicators_kept, df, want_K=False,
+                    full_indicators=None):
+    """Refit on indicators_kept, align, return (phi, score_r, K_selected).
+    K_selected only computed when want_K=True (bai_ng_ic adds cost; skip it
+    for the 332 LOIO + 200 bootstrap refits where K isn't reported per-config)."""
+    if want_K:
+        loadings_r, fscores_r, K_sel = run_poet(df, indicators_kept, want_K=True,
+                                                 full_indicators=full_indicators)
+    else:
+        loadings_r, fscores_r = run_poet(df, indicators_kept,
+                                         full_indicators=full_indicators)
+        K_sel = np.nan
     if loadings_r is None:
         return np.nan, np.nan, np.nan
-
-    # K-stability (Bai-Ng on the reduced set)
-    panel = build_panel(df, indicators_kept)
-    X, _ = panel_to_matrix(panel, indicators_kept)
-    ic, _, _ = bai_ng_ic(X)
-    K_sel = ic[2]
 
     # Restrict original loadings to the shared (kept) indicators
     shared = [c for c in indicators_kept if c in base_loadings.index]
@@ -128,7 +167,7 @@ def main():
 
     df = load_vdem()
     indicators = select_indicators(df)
-    base_loadings, base_fscores = run_poet(df, indicators)
+    base_loadings, base_fscores = run_poet(df, indicators, full_indicators=indicators)
     base_f1 = base_fscores[["country_name", "year", "f1"]].copy()
     print(f"\nBase: {len(indicators)} indicators, K={K}, "
           f"{len(base_fscores)} country-years")
@@ -148,7 +187,7 @@ def main():
         kept = [c for c in indicators if c not in drop]
         if len(kept) < 8 or len(drop) == 0:
             continue
-        phi, r, k = compare_to_base(base_loadings, base_f1, kept, df)
+        phi, r, k = compare_to_base(base_loadings, base_f1, kept, df, want_K=True, full_indicators=indicators)
         rows.append({"tier": "leave_component_out", "config": comp,
                      "n_dropped": len(drop), "n_kept": len(kept),
                      "phi": phi, "score_r": r, "K_selected": k})
@@ -159,7 +198,7 @@ def main():
     for n_top in [5, 10]:
         drop = top_loaders.head(n_top).index.tolist()
         kept = [c for c in indicators if c not in drop]
-        phi, r, k = compare_to_base(base_loadings, base_f1, kept, df)
+        phi, r, k = compare_to_base(base_loadings, base_f1, kept, df, want_K=True, full_indicators=indicators)
         rows.append({"tier": "drop_top_loaders", "config": f"top{n_top}",
                      "n_dropped": n_top, "n_kept": len(kept),
                      "phi": phi, "score_r": r, "K_selected": k})
@@ -172,7 +211,7 @@ def main():
         n_drop = int(0.2 * len(indicators))
         drop = list(RNG.choice(indicators, size=n_drop, replace=False))
         kept = [c for c in indicators if c not in drop]
-        phi, r, k = compare_to_base(base_loadings, base_f1, kept, df)
+        phi, r, k = compare_to_base(base_loadings, base_f1, kept, df, full_indicators=indicators)
         if not np.isnan(phi):
             boot_phis.append(phi)
         if (b + 1) % 50 == 0:
@@ -189,7 +228,7 @@ def main():
     loio_phis = []
     for c in indicators:
         kept = [x for x in indicators if x != c]
-        phi, _, _ = compare_to_base(base_loadings, base_f1, kept, df)
+        phi, _, _ = compare_to_base(base_loadings, base_f1, kept, df, full_indicators=indicators)
         if not np.isnan(phi):
             loio_phis.append(phi)
     loio_phis = np.array(loio_phis)

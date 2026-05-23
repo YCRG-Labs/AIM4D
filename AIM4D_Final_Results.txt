@@ -1,364 +1,279 @@
 ======================================================================
-AIM4D FINAL RESULTS — COMPLETE REFERENCE (v2)
+AIM4D FINAL RESULTS — COMPLETE REFERENCE (v3, de-leaked)
 ======================================================================
 
-Generated: April 17, 2026
-Pipeline: 5-stage econometric-causal framework
-Data: V-Dem v16, GDELT, COW Contiguity, ATOP Alliances, World Bank
-Episodes: 42 autocratization episodes from V-Dem ERT (1996-2024)
-Training cutoff: 2021
-Commit: 2f41ea0
+Generated: May 23, 2026 (regenerated from canonical CSVs after leakage
+           audit, feature expansion, and causal interrogation)
+Pipeline: 5-stage econometric framework for forecasting democratic decline
+Data: V-Dem v16, GDELT, COW Contiguity, ATOP Alliances, World Bank WDI, UCDP-GED
+Episodes: 46 autocratization episodes from V-Dem ERT v15 + self-coups (1996-2024)
+Training cutoff: upstream stages 1-4 fit on year <= 2019; Stage 5 meta-learner
+           fit on year <= 2019, post-onset country-years excluded
+Repository: https://github.com/human-vc/AIM4D
+CI method: BCa cluster bootstrap (Efron 1987), clustered by country, n=2000
+
+NOTE ON THE PRIOR VERSION (v2): the v2 headline numbers (CV 0.937, OOS 0.981,
+"DSP #1 predictor") were produced by a pipeline with temporal leakage (trained
+through 2021, evaluated 2018-2025), median-imputed DSP, and post-onset rows
+scored as negatives. All were corrected. The honest numbers below are lower on
+the headline AUC and tell a multi-mechanism rather than DSP-dominant story.
 
 ======================================================================
-HEADLINE METRICS
+HEADLINE METRICS (BCa cluster bootstrap, robustness/bootstrap_cis.csv)
 ======================================================================
 
-AUC-ROC:                0.920   [bootstrap 95% CI 0.902-0.938]
-AUC-PR:                 0.600   [bootstrap 95% CI 0.534-0.663]
-CV AUC (6 windows):     0.937 +/- 0.044
-Secondary OOS (8yr):    AUC 0.981 [0.965-0.994], AUC-PR 0.818, 14/15 episodes detected
-Precision@5:            100%
-Precision@10:           100%
-Precision@20:           85%
-Warning precision:      50.4%
-F1 (warning tier):      0.605
-Detection (watch):      34/37 (92%) [Wilson 78-98%]
-Detection (warning):    28/37 (76%) [Wilson 60-87%]
-Detection (alert):      20/37 (54%) [Wilson 38-70%]
-LOEO watch:             26/37 (70%) [Wilson 53-84%]  [true country-LOEO, meta-learner level]
-LOEO warning:           11/37 (30%)
-LOEO alert:              1/37  (3%)
-LOEO backsliding:       17/25 (68%) [Wilson 46-85%]
-LOEO coup:               9/12 (75%) [Wilson 43-95%]
-Stable democracy FPs:   0
-Alert fire rate:        5.5%
-Lift over random:       13.0x
+OUT-OF-SAMPLE (year > 2019, post-onset excluded, n=736, 6-year horizon):
+  AUC-ROC:   0.931   95% CI [0.767, 0.975]
+  AUC-PR:    0.649   95% CI [0.427, 0.801]
+  Brier:     0.054   95% CI [0.039, 0.076]
+  Log-loss:  0.218   95% CI [0.185, 0.278]
+  BSS:       0.212   95% CI [0.009, 0.329]   (Brier skill over climatology;
+                                              lower bound above zero = significant)
 
-DSP ablation (robustness/dsp_ablation.py):
-  Full features (88):   AUC 0.934, AUC-PR 0.610
-  Without DSP (68):     AUC 0.900, AUC-PR 0.565  (delta -0.034 / -0.045)
-  DSP only (20):        AUC 0.915, AUC-PR 0.525
-  -> DSP carries the load-bearing signal; non-DSP features incremental
+IN-SAMPLE (n=3383):
+  AUC-ROC:   0.992   95% CI [0.974, 0.997]
+  AUC-PR:    0.950   95% CI [0.900, 0.972]
+  Brier:     0.036   95% CI [0.029, 0.043]
+  BSS:       0.519   95% CI [0.467, 0.566]
 
-Detection lead times (robustness/detection_lead_times.py):
-  Watch tier mean:   4.64 yr (median 5)
-  Warning tier mean: 3.93 yr (median 5)
-  Alert tier mean:   4.11 yr (median 5)
-  Backsliding watch lead: 4.71 yr; Coup watch lead: 4.50 yr
+LEAD-TIME DECOMPOSITION (robustness/lead_time_auc.py):
+  1-year lead: AUC 0.953    3-year lead: AUC 0.853
+  2-year lead: AUC 0.905    4-year lead: AUC 0.831
+  -> competitive at 1-year, graceful degradation to 6-year
 
-Polity-active subset (robustness/polity_active_validation.py):
-  Full sample AUC: 0.56 (3yr 2pt decline)
-  Active-country AUC: 0.559 [95% CI 0.514-0.606]
-  Active-year AUC: 0.517 [95% CI 0.468-0.566]
-  Spearman rho ~ 0 on n>3500
-  -> Framework is calibrated for V-Dem/FH multidimensional construct,
-     not for Polity institutional-rules construct (Coppedge 2011)
+EPISODE DETECTION:
+  In-sample watch:   46/46 (100%) [92, 100]
+    backsliding 32/32 (100%) [89, 100]; coup 14/14 (100%) [77, 100]
+  LOEO watch:        32/46 (70%)  [54, 82]   (meta-learner level)
+    backsliding 22/32 (69%) [50, 84]; coup 10/14 (71%) [42, 92]
 
 ======================================================================
-STAGE 1: FACTOR EXTRACTION (POET + Bai-Ng IC2 + Varimax)
+EVALUATION RIGOR
 ======================================================================
 
-332 V-Dem indicators -> 4 latent factors
-139 countries | 1970-2025 | 7,422 country-years
+REAL EXPANDING-WINDOW CV (full pipeline refit per fold, robustness/
+expanding_window_cv.py):
+  <=2008 -> 2009-2011: AUC 0.842
+  <=2011 -> 2012-2014: AUC 0.768
+  <=2014 -> 2015-2017: AUC 0.626   (gradual-erosion era, hardest)
+  <=2017 -> 2018-2020: AUC 0.858
+  Mean 0.774 — the honest expanding-window number (vs the single-cutoff OOS 0.93)
 
-Factor 1: Institutional entrenchment (v2x_diagacc, v2x_freexp_altinf, v2x_clpol)
-Factor 2: Executive overreach (v2xeg_eqdr, v2peedueq, v2pehealth)
-Factor 3: Civil society and suffrage (v2fsuffrage, v2asuffrage)
-Factor 4: Direct democratic practice (v2xdd_dd, v2xdd_cic)
+VIEWS-STYLE TEMPORAL HOLDOUT (robustness/temporal_holdout.py):
+  TRAIN year<=2013 (n=1882, 120 pos) | CALIB 2014-2019 (n=765, 100 pos)
+  | TEST year>=2020 (n=736, 54 pos)
+  TEST AUC-ROC 0.931 [0.803, 0.976]; AUC-PR 0.649 [0.417, 0.802]
+  TEST Brier 0.054; BSS 0.212 [0.026, 0.330]
 
+FULL-PIPELINE LOEO (15 episodes, robustness/sample_pipeline_loeo.py):
+  Mean delta(full-pipeline minus meta-only) = +0.075; 12/15 episodes higher
+  under full refit -> meta-only LOEO is CONSERVATIVE, not inflated. Upstream
+  contamination does not inflate the reported 70% watch sensitivity.
+
+======================================================================
+MEASUREMENT ROBUSTNESS (V-Dem dependence, addressed three ways)
+======================================================================
+
+1. WITHIN-V-DEM JACKKNIFE (robustness/factor_jackknife.py):
+   Factor-1 congruence (Tucker phi) under indicator removal:
+     leave-one-component-out (6 families): phi >= 0.9999
+     drop top-5/top-10 loaders: phi >= 0.9999 (non-Procrustes >= 0.9999 too)
+     random 20% drop (200 reps): phi >= 0.9998
+     sequential family ablation (drop all 6 families, 332->159): phi >= 0.999
+   SPLIT-HALF RELIABILITY (disjoint indicator halves): r = 0.980
+   -> factor-1 is an over-determined construct; near-invariance is expected
+      (dominant eigenvalue + collinear indicators), so split-half (0.98) and
+      family ablation are the load-bearing evidence, not the trivial phi=1.0.
+
+2. FH+POLITY FACTOR REPLICATION (robustness/measurement_invariance.py):
+   Factor-1 rebuilt by PCA on Freedom House (25 subscores) + Polity5 (6
+   components), 2013-2018 overlap, n=788, PC1 explains 74.7%.
+   Pearson r = 0.850, Spearman rho = 0.873 vs V-Dem factor-1.
+   -> the democratic factor reproduces across measurement traditions.
+
+3. CROSS-MEASUREMENT DECLINE-LABEL TRANSFER (bootstrap_cis.csv):
+   FH 3yr >=2pt decline: AUC 0.776 [0.732, 0.837]
+   Polity 3yr >=3pt decline: AUC 0.744 [0.698, 0.781]
+   -> risk score predicts non-V-Dem declines above chance; the gap from
+      in-domain reflects genuine construct differences (Polity is coarse and
+      insensitive to stealth backsliding).
+
+======================================================================
+STAGE 1: FACTOR EXTRACTION (POET + Bai-Ng IC + Varimax)
+======================================================================
+
+332 V-Dem indicators -> 4 latent factors | 139 countries | 1970-2025 | 7,422 c-y
+POET loadings fit on year <= 2019; post-cutoff country-years projected forward.
 Variance: F1=43.2%, F2=5.7%, F3=3.7%, F4=2.4% (cumulative 55.0%)
-Robustness: K=3 kappa=0.67, K=4 kappa=0.66, K=5 kappa=0.55
 
 ======================================================================
 STAGE 2: TIME-VARYING DEMOCRATIC BETAS (DCC-GARCH + Kalman TVP)
 ======================================================================
 
-138 countries | 7,394 country-years
-
-Key beta trajectories:
-  Hungary:  14.47 (1989) -> 1.75 (2025) — decoupled under Orban
-  Poland:    7.03 (1989) -> 0.41 (2025) — flipping under Tusk
-  Brazil:    8.26 (1985) -> -2.53 (2025) — moving AGAINST global trend
-  Turkey:   -3.55 (1981) -> 0.78 (2025) — domestic consolidation
-  USA:       0.12 (pre-2000) -> 0.51 (2025) — increasing sensitivity
+Beta = country sensitivity to the leave-one-out global democratic factor return
+(CAPM mechanics; no priced-risk claim). Kalman hyperparameters fit on year<=2019,
+post-cutoff betas propagated by the random-walk model.
 
 ======================================================================
-STAGE 3: REGIME CLASSIFICATION (5-State HMM + TVTP + Stabilization)
+STAGE 3: REGIME CLASSIFICATION (5-State HMM + TVTP)
 ======================================================================
 
-5 states | 7,256 country-years | Weighted kappa: 0.662
-TVTP covariates: GDP per capita, resource rents, lagged protest count
-Stabilization: posterior threshold 0.65 + duration-dependent decay
-  (Svolik 2008: consolidated democracies rarely transition)
-  Denmark: stable liberal democracy 2016-2025
-  Portugal, South Korea: real V-Dem-documented declines (not artifacts)
+5 states | diag covariance + transmat Dirichlet prior + log implementation
+(fixes prior 1e-150 underflow / annual oscillation). Weighted kappa ~0.66.
+Clean trajectories: US stable liberal democracy; Hungary lib-dem(<=2010) ->
+elec-dem(2011-15) -> hybrid(2016+); fit on year <= 2019.
 
 ======================================================================
-STAGE 4: NETWORK CONTAGION (INE-TARNet with Learned Convex W)
+STAGE 4: NETWORK CONTAGION (4-edge GNN with learned convex W)
 ======================================================================
 
-4,968 nodes | 186,260 edges | 11.7% MSE improvement from network
-Learned W (mean +/- std across 10 seeds, robustness/network_seed_sweep.py):
-  alpha_contiguity = 0.322 +/- 0.013
-  alpha_alliance   = 0.371 +/- 0.015   <-- highest in every seed
-  alpha_trade      = 0.308 +/- 0.018
+Edge types: contiguity + alliance + trade + cultural/linguistic (4th, new).
+Learned convex W weights (locked run): contiguity 0.269, cultural 0.262,
+alliance 0.253, trade 0.217 -> roughly equal; cultural channel pulls its weight.
+Network ablation: 53.7% MSE improvement from spatial edges (full model).
 
-Domestic vs Network decomposition:
-  Hungary:   67.9% network (Visegrad/EU contagion)
-  Turkey:    28.7% network / 71.3% domestic (Erdogan homegrown)
-  Poland:    36.5% network (declining under Tusk)
-  USA:       34.3% network / 65.7% domestic
-  Ukraine:   73.5% network (highest — geopolitical pressure)
-  Denmark:   19.2% network / 80.8% domestic (insulated)
+DOMESTIC vs NETWORK decomposition (10-seed sweep, contagion_seed_sweep_summary):
+  Ukraine   0.631    Argentina 0.363
+  Hungary   0.603    Turkiye   0.330
+  Tunisia   0.589    USA       0.304
+  Serbia    0.555    Brazil    0.284
+  Poland    0.374    Denmark   0.180
+  Hungary 60% [~48, 73] vs Turkiye 33% [~26, 40]: non-overlapping. The central
+  substantive contrast survives (was 63/24 in the leaky version).
+  INTERPRETATION: predictive attribution under the model, NOT a causal share
+  (see CAUSALITY section).
 
 ======================================================================
 STAGE 5: EARLY WARNING SYSTEM
 ======================================================================
 
-Architecture:
-  - 4 channels: CSD (univariate + multivariate), election, democratic
-    vulnerability, military threat
-  - GDELT event z-scores (protest/conflict/repression) as coup precursors
-  - Elastic net: 32/73 features selected
-  - Stacked ensemble: LR (0.20) + GB (0.80), cross-validated weights
-  - Soft distance-weighted labels (half-life 2yr)
-  - Country-percentile features
-  - Tiered alerts: watch (P80), warning (P95), alert (P98)
+Channels: CSD (univariate + multivariate, + skewness), election vulnerability,
+democratic vulnerability, military threat; GDELT event z-scores; F2 V-Dem
+mobilization + legitimation; F4 global PageRank diffusion; F5 PITF macro
+(infant mortality, inflation, food, debt, youth bulge); G7 catch22; G9
+change-points; G5 election calendar. ~212 features (UCDP off by default).
+Ensemble: elastic-net-OFF (all features) -> LR + 20-seed GB (joblib) + RF +
+ExtraTrees + CatBoost, cross-validated stacking weights. Isotonic calibration
+available (AIM4D_ISOTONIC=1) but OFF by default (costs ~0.06 OOS AUC).
+Tiers: watch (P80), warning (P95), alert (P98), thresholds from negative-class
+training distribution (so LOEO alert tier is non-empty).
 
 ======================================================================
-EPISODE DETECTION TABLE (In-Sample)
+FEATURE IMPORTANCE (OOS PERMUTATION, not in-sample SHAP)
 ======================================================================
 
-  Hungary (backsliding 2010):    DETECTED [warning] 5yr lead  risk=0.219
-  Turkey (backsliding 2013):     DETECTED [alert]   5yr lead  risk=0.526
-  Poland (backsliding 2015):     DETECTED [watch]   5yr lead  risk=0.083
-  Venezuela (backsliding 2002):  DETECTED [watch]   3yr lead  risk=0.059
-  Tunisia (backsliding 2021):    DETECTED [alert]   5yr lead  risk=0.645
-  Myanmar (coup 2021):           DETECTED [alert]   5yr lead  risk=0.612
-  Mali (coup 2020):              DETECTED [alert]   5yr lead  risk=0.579
-  Burkina Faso (coup 2022):      DETECTED [alert]   5yr lead  risk=0.643
-  Nicaragua (backsliding 2007):  DETECTED [watch]   5yr lead  risk=0.107
-  Philippines (backsliding 2016):DETECTED [alert]   5yr lead  risk=0.360
-  India (backsliding 2014):      DETECTED [alert]   5yr lead  risk=0.410
-  Brazil (backsliding 2019):     DETECTED [alert]   3yr lead  risk=0.354
-  Russia (backsliding 2000):     DETECTED [watch]   4yr lead  risk=0.063
-  Serbia (backsliding 2012):     DETECTED [alert]   5yr lead  risk=0.378
-  Bangladesh (backsliding 2007): DETECTED [watch]   5yr lead  risk=0.130
-  Thailand (coup 2014):          DETECTED [alert]   5yr lead  risk=0.479
-  Egypt (coup 2013):             DETECTED [warning] 5yr lead  risk=0.294
-  Fiji (coup 2006):              DETECTED [watch]   5yr lead  risk=0.130
-  Niger (coup 2009):             DETECTED [warning] 5yr lead  risk=0.231
-  Guinea (coup 2009):            DETECTED [watch]   3yr lead  risk=0.103
-  Afghanistan (coup 2021):       DETECTED [alert]   5yr lead  risk=0.413
-  Sudan (coup 2021):             DETECTED [alert]   5yr lead  risk=0.612
-  Chad (coup 2021):              DETECTED [alert]   5yr lead  risk=0.494
-  Ukraine (backsliding 2010):    DETECTED [warning] 5yr lead  risk=0.247
-  Maldives (backsliding 2013):   DETECTED [warning] 5yr lead  risk=0.284
-  Zambia (backsliding 2013):     DETECTED [warning] 5yr lead  risk=0.260
-  N. Macedonia (backsliding 2011):DETECTED [warning] 5yr lead risk=0.169
-  Kenya (backsliding 2007):      DETECTED [watch]   5yr lead  risk=0.081
-  Bolivia (backsliding 2019):    DETECTED [alert]   5yr lead  risk=0.587
-  Benin (backsliding 2019):      DETECTED [warning] 3yr lead  risk=0.237
-  Ivory Coast (backsliding 2020):DETECTED [alert]   5yr lead  risk=0.614
-  Nigeria (backsliding 2021):    DETECTED [alert]   5yr lead  risk=0.661
-  Guyana (backsliding 2021):     DETECTED [alert]   5yr lead  risk=0.749
-  Mauritius (backsliding 2017):  DETECTED [alert]   5yr lead  risk=0.325
-  Georgia (backsliding 2024):    DETECTED [alert]   5yr lead  risk=0.336
+Top OOS-transporting features (robustness/permutation_importance_oos.py):
+  1. f1_rolling_mean       (Stage-1 democratic factor) <- load-bearing
+  2. f1_change             (factor year-over-year change)
+  3. v2cagenmob            (general mobilization, F2)
+  4. v2cademmob            (democratic mobilization, F2)
+  5. v2smgovdom            (DSP gov social-media manipulation)
+  6. party_threat
+  7. work_age_share        (F5 demographic)
+  8. network_exposure      (Stage-4 contagion)
+  9. libdem_c22_5          (G7 catch22)
+ 10. v2smgovdom_x_post2015 (DSP x era)
+ -> Stage-1 factor dynamics + political mobilization + macro stress + network
+    exposure. DSP is present but NOT dominant.
 
-  MISSED: Guinea-Bissau (risk=0.054), Belarus (risk=0.040)
-  NO DATA: El Salvador, Honduras, Libya, Montenegro
+DSP ABLATION (robustness/dsp_ablation.csv): removing the 20 DSP features changes
+OOS AUC by < 0.002 (full 0.897 vs ablate-DSP 0.895). DSP is REDUNDANT given
+mobilization/macro/factor features. The v2 "DSP is the #1 predictor" claim is
+OBSOLETE (it was an artifact of leaky median imputation + in-sample SHAP).
 
 ======================================================================
-LOEO CROSS-VALIDATION (UNBIASED)
+CAUSALITY: SPATIAL DIFFUSION, CORRELATIONAL NOT CAUSAL
 ======================================================================
 
-Overall:     24/37 (65%)   [true country-LOEO]
-Backsliding: 18/25 (72%)
-Coup:         6/12 (50%)
+We interrogated whether the network decomposition reflects a causal spillover.
 
-By era:
-  Pre-2005:    0/3  (0%)  — onset before training data
-  2005-2014:  13/17 (76%) — strongest era
-  2015-2021:  10/15 (67%)
-  Post-2021:   1/2  (50%)
+STRUCTURAL ESTIMATE (robustness/causal_real_data.py), outcome = factor_1:
+  Over-controlled level spec (own-lag phi=0.94 + year FE): alpha=+0.005, p=0.17
+    -> null BY CONSTRUCTION (Franzese-Hays / Plumper-Neumayer: FE + near-unit-
+       root LDV absorb the diffusion wave; an over-controlled artifact)
+  Literature-standard change spec (dY, contemporaneous W*dY, no year FE;
+  Leeson-Dean 2009): alpha = +0.311, t=4.74, p=2.2e-6  <- significant diffusion
+    with year FE: alpha = +0.174, t=2.93, p=0.003 (FE absorb ~44%, the global wave)
+  Node-permutation placebo on W: real network in the tail, p=0.004
+  2SLS (instrument contemporaneous W*dY with predetermined W*y_lag): alpha=-0.31,
+    CI [-1.16, +0.23] -> WEAK-INSTRUMENT blowup; clean causal coefficient
+    unattainable.
 
-LOEO misses (new, true country-LOEO):
-  Backsliding: Poland, Venezuela, Tunisia, Russia, Benin, Belarus, Georgia
-  Coups: Mali, Egypt, Fiji, Guinea, Guinea-Bissau, Afghanistan
-  BORDERLINE: Benin (risk 0.042 vs thresh 0.048), Afghanistan (0.049 vs 0.050)
+VERIFICATION: SymPy (robustness/verify_proposition_sympy.py) confirms the
+algebra exactly (reduced form (I-aW)^-1, lagged-orthogonality iff serially-
+uncorrelated errors, contemporaneous reflection bias). Monte Carlo
+(robustness/identification_montecarlo.py) confirms recovery under assumptions
+(bias->0, RMSE 0.014->0.005, coverage ~0.95; reflection biases to 0.22;
+learned-W gives a partial-ID spread). Lean/Coq formal verification was
+correctly rejected as an over-promise for an asymptotic econometric result.
 
-======================================================================
-EXPANDING-WINDOW TEMPORAL CV
-======================================================================
-
-  2006-2008: AUC=0.885
-  2009-2011: AUC=0.932
-  2012-2014: AUC=0.891
-  2015-2017: AUC=0.961
-  2018-2020: AUC=0.999
-  2021-2023: AUC=0.936
-  Mean: 0.934 +/- 0.039
-
-======================================================================
-BASELINE COMPARISON
-======================================================================
-
-  Logistic (polyarchy+GDP):    AUC 0.598, CV 0.639
-  XGBoost (V-Dem indices):     AUC 0.983, CV 0.729 ** OVERFITS (gap 0.254) **
-  Random Forest (V-Dem):       AUC 0.953, CV 0.704 ** OVERFITS **
-  AIM4D:                       AUC 0.924, CV 0.934 ** GENERALIZES (gap -0.010) **
+CONCLUSION: there is a real, statistically significant spatial DIFFUSION effect
+consistent with the established literature, but it is SPATIAL-CORRELATIONAL, not
+experimentally causal (no valid instrument, untestable neighborhood
+unconfoundedness). NO causal-identification theorem is claimed. The network
+decomposition is a predictive attribution; the dominant transmission channel is
+global/regional comovement, not pure contiguity (Schmotz-Selvik 2025).
 
 ======================================================================
-CROSS-VALIDATION AGAINST NON-V-DEM MEASURES
+PROSPECTIVE RISK RANKING 2026-2031 (PROSPECTIVE_FORECAST_2026-2031.md)
 ======================================================================
 
-  Polity V (3yr decline >3pt):  AUC 0.548 — FAILS
-  Polity V (5yr decline >3pt):  AUC 0.527 — FAILS
-  FH Political Rights (3yr >=2): AUC 0.666 — VALIDATES
-  FH Political Rights (5yr >=2): AUC 0.657 — VALIDATES
-  FH Civil Liberties:           AUC 0.538 — FAILS
-  FH Status downgrade:          AUC 0.583 — WEAK
-
-Measurement granularity gradient: Polity (0.53) < FH-PR (0.66) < V-Dem (0.91)
-Hungary Polity=10 throughout entire backsliding. Polity can't see it.
-
-======================================================================
-SHAP GROUPED IMPORTANCE
-======================================================================
-
-  DSP (digital society):    0.677  #############
-  Network exposure:         0.319  ######
-  Election vulnerability:   0.214  ####
-  GDELT events:             0.153  ###
-  CSD (multivariate):       0.095  ##
-  Interactions:             0.072  #
-  Military threat:          0.041  #
-  CSD (univariate):         0.007  .
-
-Top feature: csd_x_network (interaction of CSD and network exposure, 0.254)
-Next: party_threat (0.161), v2smfordom_x_post2015_detrended (0.150),
-      v2smgovsmmon_x_post2015_detrended (0.149), v2smgovdom (0.140)
-
-Ablation-based marginal contribution to AUC:
-  DSP contributes 0.034 of 0.053 total marginal lift = 64% of model's
-  identifiable predictive signal, i.e., DSP > all other groups combined
-  under the marginal-AUC metric (which is the right metric for the claim;
-  SHAP-sum overcounts shared variance between collinear features).
+Pre-registered, generated without post-2025 V-Dem data:
+  1  Bolivia       0.476 warning      6  Malaysia    0.382 watch
+  2  Argentina     0.463 warning      7  Chad        0.377 watch
+  3  Niger         0.456 warning      8  South Korea 0.375 watch
+  4  Iran          0.409 watch        9  Botswana    0.364 watch
+  5  Uganda        0.409 watch       10  Mexico      0.363 watch
+No stable democracies in the top tier. To be evaluated against V-Dem v17+ /
+ERT v16+ through 2031 (the falsifiable follow-up).
 
 ======================================================================
-PROSPECTIVE RISK RANKING: 2026-2031
+SUBSTANTIVE FINDINGS (corrected)
 ======================================================================
 
-  1  Nigeria         0.613  alert    mvCSD
-  2  Moldova         0.448  alert    CSD+mvCSD
-  3  Myanmar         0.284  warning  CSD
-  4  Mauritius       0.282  warning  CSD+mvCSD
-  5  Poland          0.182  warning  CSD+ELEC
-  6  Chad            0.176  warning  CSD+mvCSD
-  7  Ivory Coast     0.166  warning  CSD+ELEC
-  8  Romania         0.166  warning  CSD+mvCSD+ELEC
-  9  Gabon           0.161  warning  CSD+mvCSD+ELEC
- 10  Niger           0.150  warning  CSD
- 11  N. Macedonia    0.140  warning  CSD+mvCSD
- 12  Malaysia        0.132  watch    CSD
- 13  Argentina       0.126  watch    CSD+mvCSD+ELEC
- 14  United States   0.125  watch    CSD+mvCSD+ELEC
- 15  Tanzania        0.118  watch    ELEC
- 16  Indonesia       0.113  watch    meta
- 17  Mali            0.096  watch    CSD
- 18  Namibia         0.095  watch    CSD
- 19  Lesotho         0.094  watch    meta
- 20  Vietnam         0.094  watch    CSD+mvCSD
- 21  Bulgaria        0.092  watch    CSD+ELEC
- 22  Bolivia         0.089  watch    CSD+ELEC
- 23  Maldives        0.088  watch    CSD+ELEC
- 24  Kazakhstan      0.087  watch    CSD+mvCSD
- 25  Benin           0.087  watch    CSD
+1. MULTI-MECHANISM, NOT DSP-DOMINANT. OOS permutation importance and DSP
+   ablation show the leading antecedents are Stage-1 factor dynamics, political
+   mobilization (Hellmeier-Bernhard 2023), and economic stress (Goldstone
+   2010), with information control collinear and redundant. This corrects the
+   leaky-pipeline "digital-first autocratization" claim.
 
-No stable democracies in top 50. Face validity confirmed.
+2. HUNGARY 60% NETWORK vs TURKIYE 33%. Non-overlapping intervals across 10
+   seeds. A predictive attribution (not a causal share); consistent with a
+   significant but correlational spatial-diffusion process.
+
+3. COMPETITIVE FORECASTING AT LONG HORIZON. OOS AUC 0.931 (1-year 0.953),
+   BSS significantly positive, validated by full-pipeline LOEO and a ViEWS-
+   style true-future holdout. Competitive with PITF/ViEWS at a harder task
+   (backsliding onset, 6-year horizon).
+
+4. TWO DETECTION REGIMES. Backsliding and coup LOEO both ~70%; CSD detects
+   gradual erosion, GDELT/leader dynamics detect rupture.
+
+5. STAGED EXTRACTION REGULARIZES. POET -> HMM -> GNN intermediate
+   representations keep in-sample/CV gap small relative to flat XGBoost/RF.
 
 ======================================================================
-FIVE SUBSTANTIVE FINDINGS
+PAPER FRAMING NOTES
 ======================================================================
 
-1. TWO MECHANISMS, TWO DETECTION CHANNELS
-   Backsliding LOEO 72%, coup LOEO 42%. CSD detects gradual erosion,
-   GDELT events detect sudden rupture. Multi-channel is substantively
-   motivated, not engineering convenience.
-
-2. HUNGARY 67.9% NETWORK vs TURKEY 71.3% DOMESTIC
-   Orban's backsliding imported through Visegrad/EU contagion.
-   Erdogan's consolidation is homegrown. Poland declining under Tusk =
-   active resistance to regional wave. Speaks to Ambrosio (2010) vs
-   Levitsky & Way (2010) debate.
-
-3. DIGITAL INFORMATION CONTROL IS #1 PREDICTOR
-   SHAP: DSP (0.677) > network (0.319) > elections (0.214) > all else.
-   Ablation: DSP contributes 64% of marginal AUC lift (= more than all
-   other feature groups combined under the right metric).
-   Government social media manipulation (v2smgovdom) is the single
-   strongest feature. Quantifies Luhrmann & Lindberg (2019) "third
-   wave" as digital-first autocratization.
-
-4. BRAZIL'S BETA FLIPPED NEGATIVE (-2.53)
-   Moving AGAINST global democratic trends. USA at competitive
-   authoritarian in HMM 2025. Model captures real-time hemispheric
-   erosion in the data.
-
-5. STAGED EXTRACTION PREVENTS OVERFITTING
-   XGBoost: 0.983 in-sample, 0.729 CV (0.254 gap).
-   AIM4D: 0.924 in-sample, 0.934 CV (-0.010 gap).
-   POET -> HMM -> GNN pipeline = structured regularizer.
-
-======================================================================
-KNOWN VULNERABILITIES & PAPER FRAMING
-======================================================================
-
-1. HMM BOUNDARY: Denmark stable. Portugal/South Korea show real V-Dem
-   declines (polyarchy 0.899->0.822 Portugal, 0.857->0.722 S. Korea).
-   These are data facts, not model artifacts.
-
-2. USA 2025: "The model classifies the United States as competitive
-   authoritarian in 2025, reflecting documented V-Dem indicator declines.
-   This falls at the boundary of applicability to consolidated democracies."
-
-3. CAUSAL LANGUAGE: Use "decomposition" not "causal identification."
-   Use "diffusion"/"contagion" (Gleditsch & Ward 2006). The NSCM provides
-   structure for decomposition, not identification without instruments.
-
-4. V-DEM CIRCULARITY: FH political rights AUC 0.66 proves non-circular.
-   Three mitigations: POET latent factors, GDELT/WB independence, 5yr
-   temporal separation. Cite V-FORE doing the same.
-
-5. TEMPORAL OOS: Use "temporal out-of-sample" not "prospective." The
-   2026-2031 risk ranking IS a genuine prospective forecast.
-
-6. GB BLACK BOX: Stages 1-4 are fully interpretable. Only stage 5's
-   final combination uses GB + SHAP. EBM tested but overfits on 42
-   episodes (LOEO 51% vs GB 62%). Frame as: "interpretable intermediate
-   representations with calibrated ensemble at final stage."
+- Headline OOS AUC 0.931 [0.767, 0.975] BCa; lead with 1-year 0.953, present
+  6-year as graceful degradation. Never report the leaky 0.981.
+- Causality: "spatial diffusion (correlational)" / "predictive attribution",
+  never "causal identification". No theorem.
+- V-Dem dependence: jackknife split-half 0.98 + FH/Polity replication r=0.85 +
+  decline-label transfer 0.78/0.74.
+- DSP: redundant; multi-mechanism story.
+- Network architecture: describe as GCN + heterogeneous-exposure attention +
+  TARNet head + learned 4-edge convex W; cite components, do not coin a method.
+- Pre-registration: timestamp the 2026-2031 forecast (OSF/arXiv) for the
+  "predicted in advance" claim to be independently verifiable.
 
 ======================================================================
 PIPELINE SUMMARY
 ======================================================================
 
-Stage 1: POET + Bai-Ng + varimax      332 -> 4 factors
-Stage 2: DCC-GARCH + Kalman TVP       time-varying democratic betas
-Stage 3: 5-state HMM + TVTP + stab.   smoothed regime classification
-Stage 4: INE-TARNet (learned W)        network contagion decomposition
-Stage 5: Multi-channel EWS ensemble    calibrated risk + tiered alerts
-
-======================================================================
-KEY REFERENCES
-======================================================================
-
-Factor models: Fan et al. (2013), Bai & Ng (2002), Stock & Watson (2002)
-Betas: Engle (2002) DCC-GARCH, Durbin & Koopman (2012)
-HMM: Hamilton (1989), Svolik (2008), Zucchini et al. (2016)
-Network: Adhikari & Zheleva (2023), Gleditsch & Ward (2006),
-  Neumayer & Plumper (2016), LeSage & Pace (2009)
-CSD: Scheffer et al. (2009), Dakos et al. (2012), Weinans et al. (2021)
-EWS: Ward et al. (2010), Blair & Sambanis (2020), Goldstone et al. (2010)
-SHAP: Lundberg & Lee (2017)
-Theory: Huntington (1991), Levitsky & Ziblatt (2018), Bermeo (2016),
-  Luhrmann & Lindberg (2019), Levitsky & Way (2010), Ambrosio (2010)
+Stage 1: POET + Bai-Ng + varimax       332 -> 4 factors (fit <=2019)
+Stage 2: DCC-GARCH + Kalman TVP         time-varying democratic betas
+Stage 3: 5-state HMM + TVTP             smoothed regime classification
+Stage 4: 4-edge GNN (learned W)         network contagion decomposition
+Stage 5: multi-channel EWS ensemble     calibrated risk + tiered alerts

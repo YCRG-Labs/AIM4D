@@ -1,0 +1,2 @@
+metric,pearson,spearman,n,k_parallel_analysis,n_indicators,window,var_explained_pc1
+factor1_correlation,0.8495871567862988,0.8731163662224578,788,2,30,2013-2018,0.7472830351327244

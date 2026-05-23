@@ -21,9 +21,6 @@ import pandas as pd
 DATA = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DATA, "cultural_pairs.csv")
 
-# Cultural-linguistic blocs. ISO3 codes. Sources: Inglehart-Welzel cultural
-# map (2023 wave), Huntington civilizational clusters, primary-language
-# data from Ethnologue.
 BLOCS = {
     "anglo": ["USA", "GBR", "CAN", "AUS", "NZL", "IRL"],
     "lusophone": ["PRT", "BRA", "AGO", "MOZ", "CPV", "GNB", "STP", "TLS"],
@@ -49,7 +46,7 @@ BLOCS = {
                                 "ETH", "SLE", "LBR", "GMB", "SSD"],
     "central_europe": ["POL", "CZE", "SVK", "HUN", "SVN"],
     "italian": ["ITA", "SMR", "VAT", "MLT"],
-    "scandinavia_alt": ["DNK", "NOR", "SWE", "ISL", "FIN"],  # secondary tie
+    "scandinavia_alt": ["DNK", "NOR", "SWE", "ISL", "FIN"],
     "turkic": ["TUR", "AZE", "KAZ", "KGZ", "TKM", "UZB"],
     "persian": ["IRN", "AFG", "TJK"],
     "caribbean": ["JAM", "HTI", "DOM", "CUB", "TTO", "GUY", "SUR", "BLZ"],

@@ -61,7 +61,6 @@ def parse_stage5(log):
         m = re.search(pat, log, re.MULTILINE)
         if not m:
             continue
-        # Branch on the regex's group count, not on the matched text.
         if m.lastindex and m.lastindex >= 2:
             a, b = m.group(1), m.group(2)
             out[key] = f"{a}/{b}"
@@ -89,7 +88,6 @@ def run_config(name, env_overrides):
     print(f"\n{'='*70}\n  CONFIG: {name}    env: {env_overrides}\n{'='*70}", flush=True)
 
     env = os.environ.copy()
-    # Clean previous overrides
     for k in ["AIM4D_COUP_LEAD", "AIM4D_POS_WEIGHT", "AIM4D_SMOOTH"]:
         env.pop(k, None)
     env.update(env_overrides)

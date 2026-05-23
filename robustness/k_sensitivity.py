@@ -119,17 +119,12 @@ def run_betas_for_factors(factor_df, K):
             beta_smooth, _, _, _, _, _ = estimate_country_factor_beta(dy, dx)
             for t_idx in range(len(years)):
                 b = beta_smooth[0] if t_idx == 0 else beta_smooth[t_idx - 1] if t_idx - 1 < len(beta_smooth) else beta_smooth[-1]
-                # Find the right result row
                 row_idx = sum(
                     len(factor_df[(factor_df["country_name"] == c) & (factor_df["year"].isin(
                         factor_df[factor_df["country_name"] == c].sort_values("year")["year"]
                     ))]) for c in countries if c < country
                 )
-                # Simpler: just iterate and assign
-            # Re-do more cleanly
-        # This is getting complex -- let's simplify
 
-    # Simplified: just return factor_df with beta columns estimated
     all_rows = []
     for country in countries:
         cdf = factor_df[factor_df["country_name"] == country].sort_values("year")
@@ -218,13 +213,11 @@ def run_ews_detection(factor_df, K):
     factor_cols = [f"factor_{i+1}" for i in range(K)]
     countries = sorted(factor_df["country_name"].unique())
 
-    # Compute simple residuals (first differences)
     for fc in factor_cols:
         factor_df[f"resid_{fc}"] = factor_df.groupby("country_text_id")[fc].diff()
     factor_df = factor_df.dropna(subset=[f"resid_{fc}" for fc in factor_cols])
     resid_cols = [f"resid_{fc}" for fc in factor_cols]
 
-    # Compute variance floor from training data
     all_train_vars = []
     for country in countries:
         cdf = factor_df[factor_df["country_name"] == country].sort_values("year")
@@ -295,7 +288,6 @@ def run_ews_detection(factor_df, K):
 
     ews_df = pd.DataFrame(all_ews)
 
-    # Detection rate
     hits, total = 0, 0
     for country, info in KNOWN_EPISODES.items():
         onset = info["onset"]
@@ -307,7 +299,6 @@ def run_ews_detection(factor_df, K):
         if pre["ews_alert"].any():
             hits += 1
 
-    # AUC on combined risk
     from sklearn.metrics import roc_auc_score
     known_w = {}
     for c, info in KNOWN_EPISODES.items():
@@ -338,14 +329,12 @@ def run_k_sensitivity():
     print("  Stock & Watson (2002) forecast accuracy across K")
     print()
 
-    # Load data once
     print("Loading V-Dem data...")
     df = load_vdem()
     indicators = select_indicators(df)
     panel = build_panel(df, indicators)
     X, scaler = panel_to_matrix(panel, indicators)
 
-    # Report IC criteria
     print("\n--- Bai-Ng Information Criteria ---")
     ic_results, ic_vals, top_eigs = bai_ng_ic(X)
     print(f"  IC1 selects K={ic_results[1]}")
@@ -353,12 +342,10 @@ def run_k_sensitivity():
     print(f"  IC3 selects K={ic_results[3]}")
     print(f"  Scree elbow: K={ic_results['elbow']}")
 
-    # IC values for K=1..8
     print("\n  IC2 values (K=1..8):")
     for k in range(min(8, len(ic_vals[2]))):
         print(f"    K={k+1}: IC2={ic_vals[2][k]:.4f}")
 
-    # Extract factors for each K
     results_table = []
     loading_matrices = {}
 
@@ -399,7 +386,6 @@ def run_k_sensitivity():
             "csd_auc": auc,
         })
 
-    # Tucker congruence between K=4 (baseline) and others
     print(f"\n{'='*50}")
     print("Tucker Congruence Coefficients (vs K=4 baseline)")
     print(f"{'='*50}")
@@ -410,14 +396,12 @@ def run_k_sensitivity():
         print(f"    Mean congruence: {np.mean(np.abs(coeffs)):.3f}")
         print(f"    (>.95 = excellent, >.85 = good, <.85 = poor factor recovery)")
 
-    # Summary table
     print(f"\n{'='*50}")
     print("SUMMARY TABLE")
     print(f"{'='*50}")
     summary = pd.DataFrame(results_table)
     print(summary.to_string(index=False))
 
-    # Stability assessment
     aucs = [r["csd_auc"] for r in results_table]
     kappas = [r["weighted_kappa"] for r in results_table]
     auc_range = max(aucs) - min(aucs)
@@ -426,7 +410,6 @@ def run_k_sensitivity():
     print(f"\n  AUC range across K: {auc_range:.3f} {'(STABLE: <0.03)' if auc_range < 0.03 else '(MODERATE)' if auc_range < 0.05 else '(SENSITIVE)'}")
     print(f"  Kappa range across K: {kappa_range:.3f} {'(STABLE: <0.05)' if kappa_range < 0.05 else '(MODERATE)' if kappa_range < 0.10 else '(SENSITIVE)'}")
 
-    # Save results
     summary.to_csv(os.path.join(OUTPUT_DIR, "k_sensitivity_results.csv"), index=False)
     print(f"\nSaved to robustness/k_sensitivity_results.csv")
 

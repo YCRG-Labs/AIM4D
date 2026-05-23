@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 FACTOR_COLS = ["factor_1", "factor_2", "factor_3", "factor_4"]
 N_STATES = 5
-# AIM4D_HMM_RESTARTS overrides default 60; AIM4D_QUICK=1 drops to 10 for smoke-test
 N_RESTARTS = int(os.environ.get("AIM4D_HMM_RESTARTS",
                                  "10" if os.environ.get("AIM4D_QUICK") == "1" else "60"))
 DIRICHLET_DIAG = 50
@@ -136,11 +135,11 @@ def transmat_alpha(n_states=N_STATES):
     actually constrains EM, not just the final transmat.
     """
     diag_priors = {
-        0: 500,   # liberal_democracy: very sticky
-        1: 200,   # electoral_democracy: sticky
-        2: DIRICHLET_DIAG,   # hybrid: standard
-        3: DIRICHLET_DIAG,   # competitive_authoritarian: standard
-        4: 200,   # closed_authoritarian: sticky
+        0: 500,
+        1: 200,
+        2: DIRICHLET_DIAG,
+        3: DIRICHLET_DIAG,
+        4: 200,
     }
     alpha = np.full((n_states, n_states), DIRICHLET_OFF, dtype=float)
     for i in range(n_states):
@@ -170,9 +169,6 @@ def fit_baseline_hmm(X_all, lengths, init_means, init_covars):
             init_transmat[i, i + 1] = 0.02
     init_transmat /= init_transmat.sum(axis=1, keepdims=True)
 
-    # Diagonal of each state's covariance; full covars are near-singular over
-    # the 8-dim factor+lag space because lag features are mechanically
-    # collinear with their parents (Agent C diagnosis).
     init_covars_diag = np.array([np.diag(c) for c in init_covars])
     init_covars_diag = np.maximum(init_covars_diag, 0.05)
     alpha = transmat_alpha()
@@ -256,7 +252,6 @@ def precompute_log_emissions(X_all, means, covars):
     d = X_all.shape[1]
     log_emit = np.zeros((N, K))
 
-    # covars may be (K, d) for diagonal or (K, d, d) for full
     is_diag = covars.ndim == 2
 
     for k in range(K):
@@ -362,13 +357,13 @@ def fit_tvtp(emit_seqs, Z_seqs, baseline_model, n_covs):
     return theta
 
 
-POSTERIOR_THRESHOLD = 0.65  # New state must exceed this to override status quo
+POSTERIOR_THRESHOLD = 0.65
 DURATION_PARAMS = {
-    0: (15.0, 0.20),  # liberal_democracy: half-life 15yr, max bonus 0.20
-    1: (10.0, 0.15),  # electoral_democracy: half-life 10yr
-    2: (5.0, 0.10),   # hybrid: half-life 5yr
-    3: (5.0, 0.10),   # competitive_authoritarian
-    4: (8.0, 0.15),   # closed_authoritarian
+    0: (15.0, 0.20),
+    1: (10.0, 0.15),
+    2: (5.0, 0.10),
+    3: (5.0, 0.10),
+    4: (8.0, 0.15),
 }
 
 
@@ -389,7 +384,6 @@ def stabilize_states(states, posteriors):
         proposed_state = states[t]
 
         if proposed_state != current_state:
-            # Compute effective threshold: base + duration bonus
             base = POSTERIOR_THRESHOLD
             if current_state in DURATION_PARAMS:
                 half_life, max_bonus = DURATION_PARAMS[current_state]
@@ -422,7 +416,6 @@ def decode_all(emit_seqs, Z_seqs, lengths, country_order, df, baseline_model, th
         )
         total_ll += ll
 
-        # Posterior threshold + duration-dependent stabilization
         states = stabilize_states(states, posteriors)
 
         cdf = df[df["country_name"] == country].sort_values("year")
@@ -531,7 +524,6 @@ def run_stage3():
     X_all, lengths, country_order = prepare_sequences(df, obs_cols)
     print(f"Panel: {len(country_order)} countries, {sum(lengths)} obs\n")
 
-    # Pre-cutoff slice for HMM and TVTP fitting (decode runs on full panel below).
     df_train = df[df["year"] <= MAX_TRAIN_YEAR].copy()
     if EXCLUDE_COUNTRY:
         df_train = df_train[df_train["country_name"] != EXCLUDE_COUNTRY]
@@ -642,7 +634,6 @@ def run_stage3():
                         Z[t] = macro_lookup.loc[key].values
                 Z_seqs.append(Z)
 
-            # Fit TVTP on pre-cutoff data only; decode uses full panel below.
             emit_seqs_train = []
             Z_seqs_train = []
             for i, country in enumerate(country_order):

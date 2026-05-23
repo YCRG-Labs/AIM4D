@@ -77,7 +77,6 @@ def build_graph_single_edge_type(df, countries_iso3, years, contig_pairs,
 
     treatment = node_features[:, :TREATMENT_DIM]
 
-    # Build edges based on type
     spatial_src, spatial_dst = [], []
     temporal_src, temporal_dst = [], []
 
@@ -107,7 +106,6 @@ def build_graph_single_edge_type(df, countries_iso3, years, contig_pairs,
                     spatial_src.append(offset + i)
                     spatial_dst.append(offset + int(j))
 
-        # Temporal edges (always included)
         if t > 0:
             prev_offset = (t - 1) * N
             for i in range(N):
@@ -116,19 +114,16 @@ def build_graph_single_edge_type(df, countries_iso3, years, contig_pairs,
                 temporal_src.append(offset + i)
                 temporal_dst.append(prev_offset + i)
 
-    # Build spatial lags from the selected edge type
     spatial_lag = torch.zeros(total_nodes, TREATMENT_DIM)
     for t, year in enumerate(years):
         offset = t * N
         prev_offset = (t - 1) * N if t > 0 else offset
         treat_lag = treatment[prev_offset:prev_offset + N]
 
-        # Get edges for this time step
         step_src = [s - offset for s in spatial_src if offset <= s < offset + N]
         step_dst = [d - offset for d in spatial_dst if offset <= d < offset + N]
         spatial_lag[offset:offset + N] = neighbor_mean(treat_lag, step_src, step_dst, N)
 
-    # Use single spatial lag repeated 3x (to match expected input dim)
     node_features_aug = torch.cat([
         node_features, spatial_lag, spatial_lag, spatial_lag,
     ], dim=-1)
@@ -164,7 +159,6 @@ def compute_contagion_scores(model, x, y, edge_index, spatial_ei, node_country, 
         })
 
     scores = pd.DataFrame(rows)
-    # Average per country (latest 5 years)
     latest = scores[scores["year"] >= scores["year"].max() - 4]
     country_avg = latest.groupby("country_text_id")["contagion_score"].mean()
     return country_avg, scores
@@ -217,7 +211,6 @@ def run_network_variants():
             warnings.simplefilter("ignore")
             model = train_model(x, y, edge_index, mask_train, mask_test, in_dim)
 
-        # Ablation
         print(f"  Running ablation test...")
         ablation = network_ablation_test(model, x, y, edge_index, spatial_ei, temporal_ei,
                                          mask_train, mask_test, in_dim)
@@ -225,14 +218,12 @@ def run_network_variants():
         print(f"    MSE no network: {ablation['mse_no_network']:.6f}")
         print(f"    Network improvement: {ablation['improvement_total_network']:.1f}%")
 
-        # Contagion scores
         print(f"  Computing contagion scores...")
         country_avg, full_scores = compute_contagion_scores(
             model, x, y, edge_index, spatial_ei, node_country, node_year
         )
         all_country_scores[etype] = country_avg
 
-        # Top contagion countries
         top10 = country_avg.sort_values(ascending=False).head(10)
         print(f"\n  Top 10 network-influenced countries:")
         for iso3, score in top10.items():
@@ -248,7 +239,6 @@ def run_network_variants():
             "std_contagion": country_avg.std(),
         })
 
-    # Spearman rank correlations between W definitions
     print(f"\n{'='*50}")
     print("Spearman Rank Correlations of Country Contagion Scores")
     print(f"{'='*50}")
@@ -270,7 +260,6 @@ def run_network_variants():
 
     print(corr_matrix.to_string(float_format="%.3f"))
 
-    # Stability assessment
     off_diag = []
     for i, e1 in enumerate(etypes_with_scores):
         for j, e2 in enumerate(etypes_with_scores):
@@ -286,7 +275,6 @@ def run_network_variants():
         print(f"  Min pairwise rank correlation: {min_rho:.3f}")
         print(f"  {'STABLE (>.85)' if min_rho > 0.85 else 'MODERATE (.70-.85)' if min_rho > 0.70 else 'SENSITIVE (<.70)'}")
 
-    # Summary
     print(f"\n{'='*50}")
     print("SUMMARY TABLE")
     print(f"{'='*50}")
@@ -296,7 +284,6 @@ def run_network_variants():
     summary.to_csv(os.path.join(OUTPUT_DIR, "network_variants_results.csv"), index=False)
     corr_matrix.to_csv(os.path.join(OUTPUT_DIR, "network_rank_correlations.csv"))
 
-    # Per-country, per-edge-type contagion table (arch addition)
     per_country = pd.DataFrame(all_country_scores)
     per_country.index.name = "country_text_id"
     per_country.to_csv(os.path.join(OUTPUT_DIR, "contagion_by_edge_type.csv"))

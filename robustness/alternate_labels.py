@@ -24,7 +24,7 @@ from sklearn.metrics import roc_auc_score, average_precision_score
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bootstrap_cis import bootstrap_auc  # noqa: E402
+from bootstrap_cis import bootstrap_auc
 
 EWS_PATH = os.path.join(REPO, "stage5_ews", "ews_signals.csv")
 VDEM_PATH = os.path.join(REPO, "data", "vdem_v16.csv")
@@ -40,11 +40,9 @@ def build_decline_labels(vdem_path, col, source_name, windows=(3, 5), thresholds
     for w in windows:
         diff = df.groupby("country_text_id")[col].diff(w)
         for t in thresholds:
-            # FH: HIGHER score = LESS free (decline = positive diff)
-            # Polity: HIGHER score = more democratic (decline = negative diff)
             if source_name == "FH":
                 lbl = (diff >= t).astype(int)
-            else:  # Polity
+            else:
                 lbl = (diff <= -t).astype(int)
             key = f"{source_name}_{w}yr_{t}pt"
             tmp = df[["country_text_id", "year"]].copy()
@@ -107,7 +105,6 @@ def main():
             print(f"{key:<28s}  {len(merged):>6d}  {int(y.sum()):>4d}  "
                   f"{auc:>6.3f}  [{lo:.3f}, {hi:.3f}]  {ap:>7.3f}")
 
-    # V-Dem ERT for reference (the model's training labels)
     if "label" in valid.columns:
         y = valid["label"].astype(int).values
         s = valid["calibrated_risk"].values

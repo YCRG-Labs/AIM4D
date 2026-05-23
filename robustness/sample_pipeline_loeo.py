@@ -27,22 +27,16 @@ import numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.dirname(os.path.abspath(__file__))
 
-# 15 stratified sample episodes: 5 coups + 10 backsliding, spread across
-# eras (pre-2010, 2010-2017, post-2017) so the full-pipeline LOEO bound is
-# tight across the panel.
 SAMPLE_EPISODES = [
-    # Pre-2010 era
     ("Venezuela", 2002, "backsliding"),
     ("Bangladesh", 2007, "backsliding"),
     ("Fiji", 2006, "coup"),
     ("Niger", 2009, "coup"),
-    # 2010-2017 era
     ("Hungary", 2010, "backsliding"),
     ("Türkiye", 2013, "backsliding"),
     ("Poland", 2015, "backsliding"),
     ("Thailand", 2014, "coup"),
     ("Egypt", 2013, "coup"),
-    # Post-2017 era
     ("Tunisia", 2021, "backsliding"),
     ("Nigeria", 2021, "backsliding"),
     ("Brazil", 2019, "backsliding"),
@@ -51,7 +45,6 @@ SAMPLE_EPISODES = [
     ("Sudan", 2021, "coup"),
 ]
 
-# AIM4D_SMOKE_LIMIT trims the SAMPLE_EPISODES list for smoke-testing
 _smoke_limit = int(os.environ.get("AIM4D_SMOKE_LIMIT", "0"))
 if _smoke_limit > 0:
     SAMPLE_EPISODES = SAMPLE_EPISODES[:_smoke_limit]
@@ -108,10 +101,8 @@ def load_meta_only_loeo():
 
 
 def main():
-    # Quick dependency check — Stage 3 needs hmmlearn. Fail loudly upfront
-    # instead of after every episode crashes 60% through the pipeline.
     try:
-        import hmmlearn  # noqa: F401
+        import hmmlearn
     except ImportError:
         sys.exit(
             "ERROR: hmmlearn not installed (required by stage3_msvar). Install with:\n"
@@ -159,7 +150,6 @@ def main():
     print(f"Summary")
     print(f"{'=' * 70}")
     print(df.to_string(index=False))
-    # Defensive: if every episode crashed, df has no "delta_risk" column
     valid = df[df["delta_risk"].notna()] if "delta_risk" in df.columns else df.iloc[0:0]
     if len(valid):
         print(f"\nMean (full - meta) risk delta: {valid['delta_risk'].mean():+.4f}")
@@ -170,7 +160,6 @@ def main():
         print(f"contamination matters and meta-only LOEO is optimistic.")
     print(f"\nWrote {out_path}")
 
-    # Restore the canonical pipeline state (cutoff=2019, no exclusion)
     print(f"\nRestoring canonical pipeline state (no country excluded)...")
     env = os.environ.copy()
     env.pop("AIM4D_EXCLUDE_COUNTRY", None)

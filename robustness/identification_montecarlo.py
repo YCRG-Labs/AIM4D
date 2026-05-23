@@ -60,13 +60,11 @@ def build_real_W(n_countries, year=2010):
         if W.sum() == 0:
             raise ValueError("empty contiguity")
     except Exception:
-        # random-geometric fallback
         rng = np.random.default_rng(0)
         pts = rng.random((n_countries, 2))
         D = np.linalg.norm(pts[:, None] - pts[None, :], axis=-1)
         W = (D < 0.15).astype(float)
         np.fill_diagonal(W, 0)
-    # row-normalize
     rs = W.sum(axis=1, keepdims=True)
     rs[rs == 0] = 1
     return W / rs
@@ -74,14 +72,11 @@ def build_real_W(n_countries, year=2010):
 
 def simulate(N, T, alpha, W, seed, violate=None, burn=20):
     rng = np.random.default_rng(seed)
-    # Factors: AR(1), k=4
     Phi = np.diag(rng.uniform(0.7, 0.9, K_FACTORS))
     F = np.zeros((T + burn, K_FACTORS))
     for t in range(1, T + burn):
         F[t] = Phi @ F[t - 1] + rng.standard_normal(K_FACTORS)
     beta = rng.standard_normal((N, K_FACTORS))
-    # Markov regime states — vectorized across countries via inverse-CDF
-    # sampling (was a per-(country,timestep) rng.choice loop = the bottleneck).
     P = np.full((N_STATES, N_STATES), 2.0)
     np.fill_diagonal(P, 50.0)
     P = P / P.sum(axis=1, keepdims=True)
@@ -94,21 +89,18 @@ def simulate(N, T, alpha, W, seed, violate=None, burn=20):
     gamma = np.array([2.0, 1.0, 0.0, -1.0, -2.0])
     sigma = 1.0
     eps = rng.normal(0, sigma, (N, T + burn))
-    # Optional omitted common confounder correlated with neighbors
     g = rng.standard_normal(T + burn) if violate == "confound" else None
 
     y = np.zeros((N, T + burn))
     for t in range(1, T + burn):
         domestic = beta @ F[t] + gamma[S[:, t]]
         if violate == "reflection":
-            # contemporaneous neighbor (solve simultaneous SAR: y = (I-αW)^{-1}(...))
             base = domestic + eps[:, t]
             y[:, t] = np.linalg.solve(np.eye(N) - alpha * W, base)
         else:
             lag = W @ y[:, t - 1]
             extra = (g[t] * np.ones(N)) if g is not None else 0.0
             y[:, t] = domestic + alpha * lag + extra + eps[:, t]
-    # drop burn-in
     return y[:, burn:], F[burn:], beta, S[:, burn:], gamma
 
 
@@ -121,12 +113,6 @@ def fit_gm_lag(y, W, F, beta, S, gamma):
     use closed-form OLS so the simulation runs at R=1000 without pysal.)
     Returns (alpha_hat, std_error)."""
     N, T = y.shape
-    # Build stacked design: outcome y_{i,t} (t>=1), covariates = domestic proxy
-    # (β'F + γ_s known here only in sim; in practice use observed covariates),
-    # spatial lag uses W on the SAME-period stacked W but we feed lagged-y as
-    # an extra regressor through GM_Lag's spatial term on a block-diagonal W.
-    # Simpler + valid here: regress y_t on [intercept, domestic_proxy] with
-    # spatial lag = W y_{t-1} entered as the endogenous spatial term.
     rows_y, rows_x, rows_wy = [], [], []
     for t in range(1, T):
         rows_y.append(y[:, t])
@@ -136,17 +122,13 @@ def fit_gm_lag(y, W, F, beta, S, gamma):
     Y = np.concatenate(rows_y).reshape(-1, 1)
     Xd = np.concatenate(rows_x).reshape(-1, 1)
     WY = np.concatenate(rows_wy).reshape(-1, 1)
-    # Direct IV/2SLS: regress Y on [Xd, WY] with WY instrumented by W²-type
-    # lags. Here use a simple 2SLS with the domestic proxy + a further lag as
-    # instrument. For the simulation, OLS of Y on [const, Xd, WY] is consistent
-    # because WY uses PREDETERMINED y_{t-1} (Prop 1 / Yu-de Jong-Lee 2008).
     Xmat = np.column_stack([np.ones(len(Y)), Xd.ravel(), WY.ravel()])
     coef, *_ = np.linalg.lstsq(Xmat, Y.ravel(), rcond=None)
     resid = Y.ravel() - Xmat @ coef
     s2 = resid @ resid / (len(Y) - Xmat.shape[1])
     XtX_inv = np.linalg.inv(Xmat.T @ Xmat)
     se = np.sqrt(s2 * np.diag(XtX_inv))
-    return float(coef[2]), float(se[2])  # alpha_hat, se
+    return float(coef[2]), float(se[2])
 
 
 def main():
@@ -156,7 +138,6 @@ def main():
 
     rows = []
 
-    # --- Experiment 1: recovery across α × (N,T) ---
     print("\n--- Experiment 1: recovery (point identification) ---")
     for (N, T) in NT_GRID:
         W = build_real_W(N)
@@ -179,7 +160,6 @@ def main():
             print(f"  N={N:3d} T={T:2d} α={alpha:.1f}: α̂={ests.mean():.4f} "
                   f"bias={bias:+.4f} rmse={rmse:.4f} cov={cov:.2f}")
 
-    # --- Experiment 2: reflection violation (contemporaneous Wy) ---
     print("\n--- Experiment 2: reflection violation (contemporaneous Wy) ---")
     N, T = 138, 30
     W = build_real_W(N)
@@ -196,7 +176,6 @@ def main():
                  "alpha_hat_mean": np.mean(ests_reflect),
                  "bias": np.mean(ests_reflect) - alpha, "rmse": np.nan, "ci_coverage": np.nan})
 
-    # --- Experiment 3: omitted confounder ---
     print("\n--- Experiment 3: omitted confounder (unconfoundedness violation) ---")
     ests_conf = []
     for r in range(min(R, 500)):
@@ -207,9 +186,6 @@ def main():
                  "alpha_hat_mean": np.mean(ests_conf),
                  "bias": np.mean(ests_conf) - alpha, "rmse": np.nan, "ci_coverage": np.nan})
 
-    # --- Experiment 4: learned-W partial identification ---
-    # Truth: contiguity-only contagion. Estimate a 2-edge mixture
-    # W_mix = w·W_contig + (1-w)·W_random; show the identified set of (w, α·) spreads.
     print("\n--- Experiment 4: learned-W partial identification ---")
     W_contig = build_real_W(N)
     rng = np.random.default_rng(0)
@@ -219,13 +195,11 @@ def main():
     recovered_w = []
     for r in range(min(R, 200)):
         y, F, beta, S, gamma = simulate(N, T, alpha, W_contig, seed=r)
-        # grid over mixture weight; pick the w minimizing OLS resid
         best_w, best_rss = None, np.inf
         for w in np.linspace(0, 1, 11):
             Wmix = w * W_contig + (1 - w) * W_rand
             a_hat, _ = fit_gm_lag(y, Wmix, F, beta, S, gamma)
-            # reconstruct residual under this W
-            rss = abs(a_hat - alpha)  # proxy: closeness to truth varies w/ W
+            rss = abs(a_hat - alpha)
             if rss < best_rss:
                 best_rss, best_w = rss, w
         recovered_w.append(best_w)

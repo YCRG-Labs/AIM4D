@@ -16,15 +16,9 @@ Z_CAP = 10.0
 MIN_ABS_VAR_PCTL = 0.30
 PERSISTENCE = 2
 LEAD_YEARS = int(os.environ.get("AIM4D_LEAD_YEARS", "5"))
-N_SURROGATES = 50  # Reduced for speed; 200 for final paper runs
+N_SURROGATES = 50
 KENDALL_SIG = 0.05
 
-# --- Env-toggleable tuning knobs (default OFF = baseline) ---
-# Set AIM4D_COUP_LEAD to a number (e.g. 3) to use shorter pre-onset window for coups.
-# Set AIM4D_POS_WEIGHT to a float >1 (e.g. 3.0) to upweight positive labels.
-# Set AIM4D_SMOOTH to a number >=2 (e.g. 3) for rolling-max risk smoothing.
-# Set AIM4D_BASELINE_END / AIM4D_LEAD_YEARS / AIM4D_POSTONSET / AIM4D_WATCH_PCTL
-#   / AIM4D_WARNING_PCTL / AIM4D_ALERT_PCTL for hyperparameter sensitivity.
 COUP_LEAD_OVERRIDE = os.environ.get("AIM4D_COUP_LEAD", "").strip()
 LEAD_YEARS_COUP = int(COUP_LEAD_OVERRIDE) if COUP_LEAD_OVERRIDE else LEAD_YEARS
 POS_WEIGHT = float(os.environ.get("AIM4D_POS_WEIGHT", "1.0"))
@@ -40,11 +34,10 @@ def lead_for(info):
     return LEAD_YEARS_COUP if info.get("type") == "coup" else LEAD_YEARS
 
 KNOWN_EPISODES = {
-    # === Original 18 (confirmed by V-Dem v16) ===
     "Hungary": {"onset": 2010, "peak": 2018, "type": "backsliding"},
     "Türkiye": {"onset": 2013, "peak": 2017, "type": "backsliding"},
     "Poland": {"onset": 2015, "peak": 2019, "type": "backsliding"},
-    "Venezuela": {"onset": 2002, "peak": 2013, "type": "backsliding"},  # V-Dem onset 2002
+    "Venezuela": {"onset": 2002, "peak": 2013, "type": "backsliding"},
     "Tunisia": {"onset": 2021, "peak": 2023, "type": "backsliding"},
     "Burma/Myanmar": {"onset": 2021, "peak": 2022, "type": "coup"},
     "Mali": {"onset": 2020, "peak": 2021, "type": "coup"},
@@ -56,10 +49,9 @@ KNOWN_EPISODES = {
     "El Salvador": {"onset": 2019, "peak": 2024, "type": "backsliding"},
     "Russia": {"onset": 2000, "peak": 2012, "type": "backsliding"},
     "Serbia": {"onset": 2012, "peak": 2020, "type": "backsliding"},
-    "Bangladesh": {"onset": 2007, "peak": 2024, "type": "backsliding"},  # V-Dem onset 2007
+    "Bangladesh": {"onset": 2007, "peak": 2024, "type": "backsliding"},
     "Thailand": {"onset": 2014, "peak": 2014, "type": "coup"},
     "Egypt": {"onset": 2013, "peak": 2014, "type": "coup"},
-    # === New: Sudden autocratization (coups/collapse) ===
     "Fiji": {"onset": 2006, "peak": 2007, "type": "coup"},
     "Honduras": {"onset": 2009, "peak": 2010, "type": "coup"},
     "Niger": {"onset": 2009, "peak": 2010, "type": "coup"},
@@ -69,7 +61,6 @@ KNOWN_EPISODES = {
     "Afghanistan": {"onset": 2021, "peak": 2022, "type": "coup"},
     "Sudan": {"onset": 2021, "peak": 2022, "type": "coup"},
     "Chad": {"onset": 2021, "peak": 2022, "type": "coup"},
-    # === New: Gradual backsliding (democracy → electoral autocracy) ===
     "Ukraine": {"onset": 2010, "peak": 2013, "type": "backsliding"},
     "Maldives": {"onset": 2013, "peak": 2017, "type": "backsliding"},
     "Zambia": {"onset": 2013, "peak": 2020, "type": "backsliding"},
@@ -81,12 +72,9 @@ KNOWN_EPISODES = {
     "Ivory Coast": {"onset": 2020, "peak": 2022, "type": "backsliding"},
     "Nigeria": {"onset": 2021, "peak": 2024, "type": "backsliding"},
     "Guyana": {"onset": 2021, "peak": 2023, "type": "backsliding"},
-    # === New: Liberal democracy downward ===
     "Mauritius": {"onset": 2017, "peak": 2023, "type": "backsliding"},
     "Belarus": {"onset": 1996, "peak": 2024, "type": "backsliding"},
     "Georgia": {"onset": 2024, "peak": 2025, "type": "backsliding"},
-    # === F1 additions from V-Dem ERT v15 / Democracy Report 2025 ===
-    # Lib-dem to elec-dem transitions documented in V-Dem v16 with 5y polyarchy decline >= 0.10
     "Greece": {"onset": 2020, "peak": 2024, "type": "backsliding"},
     "Botswana": {"onset": 2021, "peak": 2024, "type": "backsliding"},
     "Slovenia": {"onset": 2021, "peak": 2024, "type": "backsliding"},
@@ -94,15 +82,12 @@ KNOWN_EPISODES = {
     "Indonesia": {"onset": 2024, "peak": 2025, "type": "backsliding"},
     "Mexico": {"onset": 2024, "peak": 2025, "type": "backsliding"},
     "Mongolia": {"onset": 2024, "peak": 2025, "type": "backsliding"},
-    # Coups / closed-auth transitions
     "Gabon": {"onset": 2023, "peak": 2024, "type": "coup"},
     "Haiti": {"onset": 2022, "peak": 2024, "type": "coup"},
-    # === G2 additions: self-coups / executive-aggrandizement episodes
-    # (Marsteintredet & Malamud 2024 self-coups database; V-Dem v16 evidence)
-    "Cambodia": {"onset": 2017, "peak": 2024, "type": "backsliding"},        # Hun Sen dissolves CNRP
-    "Tajikistan": {"onset": 2016, "peak": 2024, "type": "backsliding"},      # Rahmon constitutional ref
-    "Saudi Arabia": {"onset": 2017, "peak": 2024, "type": "backsliding"},    # MbS power consolidation
-    "Uganda": {"onset": 2017, "peak": 2024, "type": "backsliding"},          # Museveni age-limit removal
+    "Cambodia": {"onset": 2017, "peak": 2024, "type": "backsliding"},
+    "Tajikistan": {"onset": 2016, "peak": 2024, "type": "backsliding"},
+    "Saudi Arabia": {"onset": 2017, "peak": 2024, "type": "backsliding"},
+    "Uganda": {"onset": 2017, "peak": 2024, "type": "backsliding"},
 }
 
 
@@ -249,7 +234,6 @@ def multivariate_csd(resid_matrix, window=WINDOW, min_w=MIN_WINDOW):
         dom_eig[t] = eigvals[-1]
         total_var[t] = np.trace(cov)
 
-        # Mean absolute cross-correlation
         stds = np.std(chunk, axis=0, ddof=1)
         stds = np.maximum(stds, 1e-10)
         corr = cov / np.outer(stds, stds)
@@ -280,7 +264,6 @@ def kendall_tau_with_surrogates(series, window=WINDOW, n_surrogates=N_SURROGATES
         tau, _ = stats.kendalltau(np.arange(len(c_valid)), c_valid)
         taus[t] = tau
 
-        # ARMA(1) surrogates: generate series with same AR(1) + variance
         if len(c_valid) >= 5:
             ar1 = np.corrcoef(c_valid[:-1], c_valid[1:])[0, 1] if np.std(c_valid) > 1e-10 else 0
             ar1 = np.clip(ar1, -0.99, 0.99)
@@ -411,14 +394,14 @@ def run_ews():
         max_abs = np.full(len(years), np.nan)
 
         for rc in resid_cols:
-            rv, ra, rk, rs, rabs = rolling_stats(cdf[rc].values)  # G8: skew + abs added
+            rv, ra, rk, rs, rabs = rolling_stats(cdf[rc].values)
             vz = country_z(rv, years)
             az = country_z(ra, years)
             kz = country_z(rk, years)
-            sz = country_z(rs, years)  # G8: skewness z-score
+            sz = country_z(rs, years)
             vt = rolling_kendall(rv)
             at = rolling_kendall(ra)
-            st = rolling_kendall(rs)  # G8: skewness trend
+            st = rolling_kendall(rs)
 
             for t in range(len(years)):
                 above_floor = not np.isnan(rv[t]) and rv[t] > abs_var_floor
@@ -434,35 +417,30 @@ def run_ews():
                         factor_alerts[t] += 1
 
                 for m, v in [("var_z", vz[t]), ("ar1_z", az[t]), ("kurt_z", kz[t]),
-                             ("skew_z", sz[t]),  # G8
+                             ("skew_z", sz[t]),
                              ("var_tau", vt[t] if t < len(vt) else np.nan),
                              ("ar1_tau", at[t] if t < len(at) else np.nan),
-                             ("skew_tau", st[t] if t < len(st) else np.nan)]:  # G8
+                             ("skew_tau", st[t] if t < len(st) else np.nan)]:
                     if np.isnan(best[m][t]) or (not np.isnan(v) and v > best[m][t]):
                         best[m][t] = v
                 if np.isnan(max_abs[t]) or (not np.isnan(rv[t]) and rv[t] > max_abs[t]):
                     max_abs[t] = rv[t]
 
-        # --- Multivariate CSD (Weinans et al. 2021, Held & Kleinen 2004) ---
         factor_resid_cols = [f"resid_factor_{k+1}" for k in range(4)]
         available_fc = [c for c in factor_resid_cols if c in cdf.columns]
         resid_matrix = cdf[available_fc].values if available_fc else np.zeros((len(years), 1))
 
         dom_eig, mean_xcorr, total_var = multivariate_csd(resid_matrix)
 
-        # Kendall tau with surrogate significance for multivariate indicators
         eig_tau, eig_sig = kendall_tau_with_surrogates(dom_eig)
         xcorr_tau, xcorr_sig = kendall_tau_with_surrogates(mean_xcorr)
         var_tau_mv, var_sig = kendall_tau_with_surrogates(total_var)
 
-        # Z-scores for multivariate indicators
         eig_z = country_z(dom_eig, years)
         xcorr_z = country_z(mean_xcorr, years)
 
-        # Multivariate CSD alert: significant upward trend in eigenvalue OR cross-correlation
         mv_csd_alert = eig_sig | xcorr_sig | var_sig
 
-        # --- CSD index: univariate only (original formula, preserved for meta-learner) ---
         csd_idx = np.zeros(len(years))
         for t in range(len(years)):
             components = []
@@ -475,7 +453,6 @@ def run_ews():
                         components.append(max(0, best[m][t]) * 2)
             csd_idx[t] = np.mean(components) if components else 0
 
-        # --- Multivariate CSD index (separate channel for meta-learner) ---
         mv_csd_idx = np.zeros(len(years))
         for t in range(len(years)):
             mv_components = []
@@ -487,7 +464,6 @@ def run_ews():
                 mv_components.append(max(0, eig_tau[t]) * 3)
             mv_csd_idx[t] = np.mean(mv_components) if mv_components else 0
 
-        # --- Relaxed alert: univariate OR multivariate CSD ---
         raw_univariate = (factor_alerts >= 3) | ((factor_alerts >= 2) & (csd_idx > 2.5)) | ((factor_alerts >= 1) & (csd_idx > 4.0))
         raw_multivariate = mv_csd_alert & (csd_idx > 1.5)
         raw = raw_univariate | raw_multivariate
@@ -498,9 +474,9 @@ def run_ews():
                 "country_name": country, "country_text_id": cid,
                 "year": int(years[t]),
                 "var_z": best["var_z"][t], "ar1_z": best["ar1_z"][t], "kurt_z": best["kurt_z"][t],
-                "skew_z": best["skew_z"][t],  # G8
+                "skew_z": best["skew_z"][t],
                 "var_trend": best["var_tau"][t], "ar1_trend": best["ar1_tau"][t],
-                "skew_trend": best["skew_tau"][t],  # G8
+                "skew_trend": best["skew_tau"][t],
                 "n_factors": factor_alerts[t], "csd_index": csd_idx[t],
                 "mv_csd_index": mv_csd_idx[t],
                 "dom_eig_z": eig_z[t], "xcorr_z": xcorr_z[t],
@@ -604,7 +580,6 @@ def run_ews():
         else:
             print(f"  {country}: no military threat alert")
 
-    # GDELT event z-scores as coup precursor features
     gdelt_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "gdelt_country_year.csv")
     gdelt_features = []
     if os.path.exists(gdelt_path):
@@ -612,7 +587,6 @@ def run_ews():
         gdelt = gdelt.rename(columns={"country_code": "country_text_id"})
         for col in ["protest_count", "conflict_count", "repression_count"]:
             if col in gdelt.columns:
-                # Country-relative z-scores (rolling 5yr baseline)
                 gdelt[f"{col}_mean"] = gdelt.groupby("country_text_id")[col].transform(
                     lambda x: x.rolling(5, min_periods=3).mean().shift(1)
                 )
@@ -623,7 +597,6 @@ def run_ews():
                 gdelt[f"{col}_zscore"] = gdelt[f"{col}_zscore"].clip(-10, 10)
                 gdelt_features.append(f"{col}_zscore")
 
-        # 1yr lag of z-scores (signal the year before)
         for col in ["protest_count", "conflict_count", "repression_count"]:
             lag_col = f"{col}_zscore_lag1"
             gdelt[lag_col] = gdelt.groupby("country_text_id")[f"{col}_zscore"].shift(1)
@@ -637,14 +610,12 @@ def run_ews():
                 ews_df[gf] = ews_df[gf].fillna(0)
         print(f"\n  GDELT event features loaded: {gdelt_features}")
 
-    # V-Dem institutional erosion indicators (for Poland/Tunisia-type gradual backsliding)
     institutional_cols = ["v2juncind", "v2xlg_legcon", "v2x_jucon", "v2exrescon"]
     try:
         vdem_inst_avail = [c for c in institutional_cols if c in pd.read_csv(vdem_path, low_memory=False, nrows=1).columns]
         if vdem_inst_avail:
             inst_data = pd.read_csv(vdem_path, low_memory=False,
                                      usecols=["country_text_id", "year"] + vdem_inst_avail)
-            # Compute year-over-year change (decline = negative)
             inst_features = []
             for col in vdem_inst_avail:
                 inst_data[f"{col}_change"] = inst_data.groupby("country_text_id")[col].diff()
@@ -654,16 +625,13 @@ def run_ews():
                                    on=["country_text_id", "year"], how="left")
             for f in inst_features:
                 ews_df[f] = ews_df[f].fillna(0)
-            gdelt_features += inst_features  # add to same list for meta-learner inclusion
+            gdelt_features += inst_features
             print(f"  Institutional erosion features loaded: {vdem_inst_avail}")
     except Exception:
         pass
 
-    # F5: PITF / IMF macro stress features (infant mortality, inflation,
-    # food production, external debt, youth bulge proxy). Goldstone 2010
-    # finds infant mortality is the single strongest non-V-Dem predictor.
-    base_dir = os.path.dirname(os.path.abspath(__file__))  # also defined later for V-Dem merge
-    vdem_path = os.path.join(base_dir, "..", "data", "vdem_v16.csv")  # used by G5 / DSP merge
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    vdem_path = os.path.join(base_dir, "..", "data", "vdem_v16.csv")
     pitf_path = os.path.join(base_dir, "..", "data", "macro_pitf.csv")
     pitf_features = []
     if os.path.exists(pitf_path):
@@ -674,7 +642,6 @@ def run_ews():
         ews_df = ews_df.merge(pitf, on=["country_text_id", "year"], how="left")
         for f in pitf_features:
             ews_df[f] = ews_df.groupby("country_text_id")[f].ffill()
-            # Use train-period median only (no post-cutoff leakage)
             train_median = ews_df.loc[ews_df["year"] <= TRAIN_CUTOFF, f].median()
             if pd.isna(train_median):
                 train_median = 0.0
@@ -683,8 +650,6 @@ def run_ews():
     else:
         print(f"  F5 PITF: macro_pitf.csv not found; run data/download_pitf.py to enable")
 
-    # F4: Global PageRank-weighted backsliding-exposure (Schmotz & Selvik 2025).
-    # Captures the "backsliding is global, not neighbor-only" finding.
     diff_path = os.path.join(base_dir, "..", "data", "global_diffusion.csv")
     diffusion_features = []
     if os.path.exists(diff_path):
@@ -698,9 +663,6 @@ def run_ews():
     else:
         print(f"  F4 global diffusion: global_diffusion.csv not found; run data/compute_global_diffusion.py")
 
-    # F3: Archigos leader features (Goemans, Gleditsch & Chiozza 2009).
-    # Tenure, irregular entry, military background — targets the 2021-23 coup
-    # cluster weakness (Beger, Dorff & Ward 2014 use these in CoupCast).
     arch_path = os.path.join(base_dir, "..", "data", "archigos_features.csv")
     archigos_features = []
     if os.path.exists(arch_path):
@@ -719,9 +681,6 @@ def run_ews():
     else:
         print(f"  F3 Archigos: archigos_features.csv not found; run data/download_archigos.py")
 
-    # G7: catch22 recurrent time-series features (Lubba et al. 2019)
-    # per country trajectory: 22 stats over rolling 10-yr window on
-    # v2x_polyarchy + v2x_libdem.
     c22_path = os.path.join(base_dir, "..", "data", "catch22_features.csv")
     c22_features = []
     if os.path.exists(c22_path):
@@ -735,7 +694,6 @@ def run_ews():
     else:
         print(f"  G7 catch22: catch22_features.csv not found; run data/compute_catch22.py")
 
-    # G9: Change-point features (years since last polyarchy/libdem break)
     cp_path = os.path.join(base_dir, "..", "data", "changepoints.csv")
     cp_features = []
     if os.path.exists(cp_path):
@@ -749,14 +707,6 @@ def run_ews():
     else:
         print(f"  G9 change-points: changepoints.csv not found; run data/compute_changepoints.py")
 
-    # F6: UCDP-GED state-based conflict features (Hegre et al. 2019 ViEWS,
-    # Beger-Dorff-Ward 2014 spatial-lag). OPT-IN via AIM4D_USE_UCDP=1.
-    # Empirical test (with this exact panel): adding UCDP gave +0.006 OOS
-    # AUC-PR but cost 2 LOEO episodes AND pushed BSS lower bound back below
-    # zero (loses "statistically significant Brier skill" claim).
-    # Mechanism: Beger-Morgan-Ward 2021 stealth autocratization — UCDP helps
-    # the coup subset but hurts the backsliding subset that dominates OOS.
-    # Default OFF. Set AIM4D_USE_UCDP=1 to include for ablation comparison.
     ucdp_path = os.path.join(base_dir, "..", "data", "ucdp_features.csv")
     ucdp_features = []
     if os.path.exists(ucdp_path) and os.environ.get("AIM4D_USE_UCDP") == "1":
@@ -765,9 +715,9 @@ def run_ews():
         ews_df = ews_df.merge(ucdp, on=["country_text_id", "year"], how="left")
         for f in ucdp_features:
             if f == "ucdp_years_since_onset":
-                ews_df[f] = ews_df[f].fillna(25)  # sentinel: never had onset
+                ews_df[f] = ews_df[f].fillna(25)
             else:
-                ews_df[f] = ews_df[f].fillna(0.0)  # countries with no UCDP events
+                ews_df[f] = ews_df[f].fillna(0.0)
         print(f"  F6 UCDP conflict features loaded ({len(ucdp_features)}): "
               f"{ucdp_features}")
     elif os.path.exists(ucdp_path):
@@ -776,12 +726,6 @@ def run_ews():
     else:
         print(f"  F6 UCDP: ucdp_features.csv not found; run data/build_ucdp_features.py")
 
-    # G5: Election-calendar features. Derived from V-Dem v2eltype_0..9
-    # (election-type-occurred-this-year indicators). Strictly causal because
-    # election schedules are public ex ante.
-    # Built from scratch in a fresh DataFrame to avoid fragmentation issues
-    # with in-place column assignment that some pandas versions surface as
-    # "Column not found" KeyError.
     elec_calendar_features = []
     try:
         eltype_cols = [f"v2eltype_{i}" for i in range(10)]
@@ -794,7 +738,6 @@ def run_ews():
             raw = raw.sort_values(["country_text_id", "year"]).reset_index(drop=True)
             election_any = (raw[elcols_avail].fillna(0) > 0).any(axis=1).astype(int).to_numpy()
 
-            # Per-country forward iteration to compute years-since-last-election.
             countries = raw["country_text_id"].to_numpy()
             years = raw["year"].astype(int).to_numpy()
             yse_arr = np.full(len(raw), 99, dtype=int)
@@ -810,8 +753,6 @@ def run_ews():
                 if last_elec_year > -9999:
                     yse_arr[i] = int(years[i]) - last_elec_year
 
-            # Dict lookup instead of merge to avoid pandas merge/dtype issues
-            # that have plagued every prior version of this block on Brev.
             yse_lookup = {(str(c), int(y)): int(v)
                           for c, y, v in zip(countries, years, yse_arr)}
             ews_keys = list(zip(ews_df["country_text_id"].astype(str).values,
@@ -825,7 +766,6 @@ def run_ews():
     except Exception as e:
         print(f"  G5 election calendar: skipped ({type(e).__name__}: {e})")
 
-    # Legacy OR-based alert (kept for backwards compatibility, NOT primary metric)
     ews_df["combined_alert_legacy"] = ews_df["ews_alert"] | ews_df["election_alert"] | ews_df["dem_vulnerability_alert"] | ews_df["military_threat_alert"]
 
     print(f"\n{'='*60}")
@@ -837,15 +777,12 @@ def run_ews():
 
     known_w = {}
     postonset_w = {}
-    POSTONSET_EXCL_YEARS = POSTONSET_EXCL_YEARS_ENV  # env-toggleable for sensitivity
+    POSTONSET_EXCL_YEARS = POSTONSET_EXCL_YEARS_ENV
     for c, info in KNOWN_EPISODES.items():
         onset = info["onset"]
         lead = lead_for(info)
         for y in range(onset - lead, onset + 1):
             known_w[(c, y)] = True
-        # Country-years already inside an active autocratization episode are
-        # "post-treatment" observations and should not be evaluated as
-        # negatives (Goldstone 2010, ViEWS convention).
         for y in range(onset + 1, onset + 1 + POSTONSET_EXCL_YEARS):
             postonset_w[(c, y)] = True
 
@@ -857,9 +794,6 @@ def run_ews():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     vdem_path = os.path.join(base_dir, "..", "data", "vdem_v16.csv")
     dsp_cols = ["v2smgovdom", "v2smfordom", "v2smgovfilprc", "v2smgovsmmon", "v2smpardom"]
-    # F2: mobilization (Hellmeier & Bernhard 2023, CPS) and legitimation
-    # (V-Dem) features. Pro-autocratic mobilization and personalist
-    # legitimation are documented backsliding precursors with 3-7 year lead.
     mob_cols = ["v2caautmob", "v2cademmob", "v2cagenmob", "v2caconmob"]
     legit_cols = ["v2exl_legitideol", "v2exl_legitlead", "v2exl_legitperf", "v2exl_legitratio"]
     vdem_extra_cols = dsp_cols + mob_cols + legit_cols
@@ -873,17 +807,10 @@ def run_ews():
             dsp_data = pd.read_csv(vdem_path, low_memory=False,
                                    usecols=["country_text_id", "year"] + vdem_extra_available)
             ews_df = ews_df.merge(dsp_data, on=["country_text_id", "year"], how="left")
-            # DSP imputation strategy is env-toggleable for robustness checks:
-            #   ffill_2000 (default): restrict to year>=2000 (Mechkova et al.
-            #     DSP-WP1: DSP coverage begins 2000; pre-2000 is structurally
-            #     missing, not MCAR), then country-level forward-fill within.
-            #   median_full: keep all years, fill missing DSP with TRAIN-PERIOD
-            #     country-level median (no future leakage, no row drops).
             dsp_strategy = os.environ.get("AIM4D_DSP_STRATEGY", "ffill_2000")
             n_before = len(ews_df)
             if dsp_strategy == "median_full":
                 for c in dsp_available:
-                    # Use train-period median per country to avoid future leakage
                     train_slice = ews_df[ews_df["year"] <= TRAIN_CUTOFF]
                     med_by_country = train_slice.groupby("country_text_id")[c].median()
                     global_med = train_slice[c].median()
@@ -900,10 +827,6 @@ def run_ews():
                     ews_df[c] = ews_df.groupby("country_text_id")[c].ffill()
                 print(f"  Restricted to year >= 2000 (DSP coverage window): "
                       f"{n_before} -> {len(ews_df)} country-years")
-            # Mobilization + legitimation: country-level forward-fill ONLY for
-            # any tiny gaps. Backward-fill removed (was using future values to
-            # fill past gaps — temporal leakage). Remaining NaN dropped from
-            # affected rows via per-feature fillna(0) sentinel.
             for c in mob_available + legit_available:
                 ews_df[c] = ews_df.groupby("country_text_id")[c].ffill()
                 ews_df[c] = ews_df[c].fillna(0.0)
@@ -926,26 +849,23 @@ def run_ews():
         ews_df["network_exposure"] = 0
         ews_df["csd_x_network"] = 0
 
-    # Deduplicate after all merges (some data sources have duplicate country-year keys)
     ews_df = ews_df.drop_duplicates(subset=["country_text_id", "year"], keep="first").reset_index(drop=True)
 
-    # --- Feature engineering for meta-learner ---
     base_features = (["csd_index", "mv_csd_index", "election_vulnerability", "party_threat",
                       "mil_zscore", "network_exposure", "csd_x_network"]
                      + dsp_available
-                     + mob_available  # F2: pro/anti-autocratic mobilization (Hellmeier-Bernhard 2023)
-                     + legit_available  # F2: personalist/performance/ideology legitimation
-                     + pitf_features  # F5: infant mortality, inflation, food prod, ext debt, youth bulge
-                     + diffusion_features  # F4: global PageRank backsliding exposure (Schmotz-Selvik 2025)
-                     + archigos_features  # F3: leader tenure, irregular entry, military background
-                     + elec_calendar_features  # G5: years since/within election (NELDA-style, strict causal)
-                     + cp_features  # G9: change-point years-since-break per V-Dem polyarchy / libdem
-                     + c22_features  # G7: catch22 rolling-window time-series statistics
-                     + ucdp_features  # F6: UCDP state-based conflict (Hegre 2019 / Beger 2014)
+                     + mob_available
+                     + legit_available
+                     + pitf_features
+                     + diffusion_features
+                     + archigos_features
+                     + elec_calendar_features
+                     + cp_features
+                     + c22_features
+                     + ucdp_features
                      + gdelt_features)
     available_base = [f for f in base_features if f in ews_df.columns]
 
-    # (1) Lagged features: 1yr and 2yr lags capture trends
     core_lag_features = ["csd_index", "mv_csd_index", "election_vulnerability", "mil_zscore"]
     for feat in core_lag_features:
         if feat in ews_df.columns:
@@ -959,7 +879,6 @@ def run_ews():
         if feat in ews_df.columns:
             lag_features += [f"{feat}_lag1", f"{feat}_lag2", f"{feat}_delta1", f"{feat}_delta2"]
 
-    # Era interactions
     ews_df["era_post2015"] = (ews_df["year"] > 2015).astype(float)
     era_features = []
     for feat in ["csd_index", "election_vulnerability", "mil_zscore"] + dsp_available:
@@ -967,7 +886,6 @@ def run_ews():
             ews_df[f"{feat}_x_post2015"] = ews_df[feat] * ews_df["era_post2015"]
             era_features.append(f"{feat}_x_post2015")
 
-    # Detrended features
     available_for_detrend = available_base + era_features
     detrended_features = []
     for feat in available_for_detrend:
@@ -976,17 +894,12 @@ def run_ews():
             ews_df[f"{feat}_detrended"] = ews_df[feat] - yearly_median
             detrended_features.append(f"{feat}_detrended")
 
-    # Nonlinear interactions for gradient boosting
     if "csd_index" in ews_df.columns and "election_vulnerability" in ews_df.columns:
         ews_df["csd_x_election"] = ews_df["csd_index"] * ews_df["election_vulnerability"]
     if "csd_index" in ews_df.columns and "mil_zscore" in ews_df.columns:
         ews_df["csd_x_military"] = ews_df["csd_index"] * ews_df["mil_zscore"]
     interaction_features = [f for f in ["csd_x_election", "csd_x_military"] if f in ews_df.columns]
 
-    # (2) Country-percentile features: relative risk within each country's
-    # history. Uses EXPANDING rank — for year T the percentile is computed
-    # over years [country_start, T] only, never including T+1..end. Prevents
-    # future leakage that a plain groupby.rank(pct=True) would introduce.
     ews_df = ews_df.sort_values(["country_text_id", "year"]).reset_index(drop=True)
     for feat in ["csd_index", "mv_csd_index", "election_vulnerability"]:
         if feat in ews_df.columns:
@@ -997,11 +910,6 @@ def run_ews():
     pctile_features = [f"{f}_pctile" for f in ["csd_index", "mv_csd_index", "election_vulnerability"]
                        if f"{f}_pctile" in ews_df.columns]
 
-    # Lagged expanding-pctile: year T uses the expanding-pctile from year T-3.
-    # Strictly causal (lag is past-only) AND restores the "country history is
-    # unusual" signal that helps coup precursors (1-3 year horizon). Coup
-    # detection LOEO regressed when we removed the leaky non-lagged version,
-    # so adding this honest lagged variant.
     lagged_pctile_features = []
     for feat in ["csd_index", "mv_csd_index", "election_vulnerability"]:
         if f"{feat}_pctile" in ews_df.columns:
@@ -1009,14 +917,12 @@ def run_ews():
             ews_df[new_col] = (
                 ews_df.groupby("country_text_id")[f"{feat}_pctile"].shift(3)
             )
-            # Fill pre-lag rows with the country's own first observed pctile (sentinel 0.5)
             ews_df[new_col] = ews_df[new_col].fillna(0.5)
             lagged_pctile_features.append(new_col)
 
     all_meta = (available_base + lag_features + pctile_features
                 + lagged_pctile_features + era_features + detrended_features
                 + interaction_features)
-    # DIAGNOSTIC: feature counts by category (to debug feature-count regressions)
     print(f"  [diag] available_base={len(available_base)}  lag={len(lag_features)}  "
           f"pctile={len(pctile_features)}  lagged_pctile={len(lagged_pctile_features)}  "
           f"era={len(era_features)}  detrended={len(detrended_features)}  "
@@ -1033,9 +939,7 @@ def run_ews():
     print(f"  [diag] available_base sample: {sorted(available_base)[:15]}")
     print(f"  [diag] ews_df cols total: {len(ews_df.columns)}")
 
-    # (2b) Soft distance-weighted labels (exponential decay from onset)
-    # Years closer to onset get higher weight, captures proximity gradient
-    label_decay = 2.0  # half-life in years
+    label_decay = 2.0
     known_w_soft = {}
     for c, info in KNOWN_EPISODES.items():
         lead = lead_for(info)
@@ -1045,20 +949,16 @@ def run_ews():
     ews_df["label_soft"] = ews_df.apply(
         lambda r: known_w_soft.get((r["country_name"], r["year"]), 0.0), axis=1
     )
-    # Binary label for evaluation (any nonzero soft label)
     ews_df["label"] = (ews_df["label_soft"] > 0.05).astype(int)
 
     X_meta = ews_df[all_meta].fillna(0).values
-    y_meta = ews_df["label"].values  # binary for classifiers
-    y_meta_soft = ews_df["label_soft"].values  # soft for sample weighting
-    # Exclude post-onset country-years from training: they are post-treatment
-    # observations, not candidates for new onset prediction.
+    y_meta = ews_df["label"].values
+    y_meta_soft = ews_df["label_soft"].values
     train_mask = (ews_df["year"] <= TRAIN_CUTOFF) & (~ews_df["is_postonset"])
     if EXCLUDE_COUNTRY:
         train_mask = train_mask & (ews_df["country_name"] != EXCLUDE_COUNTRY)
         print(f"  Task F: excluding country '{EXCLUDE_COUNTRY}' from meta-learner training")
 
-    # Fit scaler on training data only (no peeking at OOS distribution)
     scaler_meta = SS()
     scaler_meta.fit(X_meta[train_mask.values])
     X_meta_scaled = scaler_meta.transform(X_meta)
@@ -1067,28 +967,19 @@ def run_ews():
         half_life = 8
         max_year = ews_df.loc[train_mask, "year"].max()
         time_weights = np.exp(-np.log(2) * (max_year - ews_df["year"].values) / half_life)
-        # POS_WEIGHT > 1.0 upweights positive labels. Default 1.0 = baseline.
         train_weights = time_weights * np.where(y_meta == 1, POS_WEIGHT, 1.0)
         if POS_WEIGHT != 1.0:
             print(f"  Class weighting: positive samples upweighted {POS_WEIGHT}x")
 
-        # (3) Feature selection: use all features. Earlier elastic-net selection
-        # (alpha=0.005) was costing ~0.07 OOS AUC vs all-features (per DSP
-        # ablation run on full panel). GB's built-in regularization handles
-        # noise; explicit pruning hurts here.
-        from sklearn.linear_model import SGDClassifier  # kept for compat with other imports
-        # Still fit enet for reporting (coefficients show what the linear model would prune)
+        from sklearn.linear_model import SGDClassifier
         enet = SGDClassifier(
             loss="log_loss", penalty="elasticnet", l1_ratio=0.5,
             alpha=0.005, max_iter=2000, random_state=42, class_weight="balanced",
         )
         enet.fit(X_meta_scaled[train_mask], y_meta[train_mask],
                  sample_weight=time_weights[train_mask])
-        # Reporting-only: which features WOULD have been selected
         report_mask = np.abs(enet.coef_[0]) > 1e-4
         n_selected = report_mask.sum()
-        # Default uses all features (pruning costs ~0.07 OOS AUC at last test).
-        # Set AIM4D_USE_ENET=1 to enable elastic-net pruning as a robustness check.
         if os.environ.get("AIM4D_USE_ENET") == "1":
             selected_mask = report_mask
             selected_features = [f for f, s in zip(all_meta, selected_mask) if s]
@@ -1101,21 +992,14 @@ def run_ews():
 
         X_selected = X_meta_scaled[:, selected_mask] if selected_mask.sum() >= 5 else X_meta_scaled
 
-        # (4) Stacked ensemble with cross-validated weights
-        # Reduces CV variance vs fixed 50/50 (Wolpert 1992, Breiman 1996)
         from sklearn.ensemble import GradientBoostingClassifier
         from sklearn.model_selection import StratifiedKFold
 
-        # Model A: Logistic regression (calibrated, low variance)
         meta_lr = LogisticRegressionCV(cv=3, scoring="average_precision", max_iter=1000, random_state=42)
         meta_lr.fit(X_selected[train_mask], y_meta[train_mask],
                     sample_weight=train_weights[train_mask])
         lr_risk = meta_lr.predict_proba(X_selected)[:, 1]
 
-        # Model B: Gradient boosting ensemble (random-seed bag, averaged) —
-        # reduces OOS variance and stabilises AUC-PR.
-        # Parallelized via joblib for ~Ncore speedup on multi-core boxes.
-        # AIM4D_QUICK=1 drops to 5 seeds for fast smoke-testing.
         from joblib import Parallel, delayed
         N_SEEDS = 5 if os.environ.get("AIM4D_QUICK") == "1" else 20
 
@@ -1132,11 +1016,9 @@ def run_ews():
             delayed(_fit_gb)(s) for s in range(N_SEEDS)
         )
         gb_risks = [m.predict_proba(X_selected)[:, 1] for m in gb_models]
-        meta_gb = gb_models[0]  # keep first for feature_importances_
+        meta_gb = gb_models[0]
         gb_risk = np.mean(gb_risks, axis=0)
 
-        # G3: CatBoost as third base learner. Better small-N regularization
-        # than sklearn GB; ordered boosting reduces target leakage.
         cb_risk = None
         try:
             from catboost import CatBoostClassifier
@@ -1153,8 +1035,6 @@ def run_ews():
         except Exception as e:
             print(f"  G3 CatBoost: skipped ({type(e).__name__}: {e})")
 
-        # G6: Diverse base learners — RandomForest + ExtraTrees for orthogonal
-        # error structure relative to GB family. Helps stacked ensemble.
         from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
         rf = RandomForestClassifier(n_estimators=500, max_depth=10,
                                     min_samples_leaf=10, class_weight="balanced",
@@ -1170,11 +1050,6 @@ def run_ews():
         et_risk = et.predict_proba(X_selected)[:, 1]
         print(f"  G6 RandomForest + ExtraTrees fitted")
 
-        # G4: TabPFN-2.5 as fifth base learner (pretrained transformer for small
-        # tabular). Opt-in via AIM4D_USE_TABPFN=1 because the recent TabPFN
-        # release requires interactive license acceptance / API key, which
-        # blocks headless runs. To enable: accept license at priorlabs.ai,
-        # export TABPFN_API_KEY=..., then set AIM4D_USE_TABPFN=1 and re-run.
         tab_risk = None
         if os.environ.get("AIM4D_USE_TABPFN") == "1":
             try:
@@ -1189,7 +1064,6 @@ def run_ews():
             print(f"  G4 TabPFN: skipped (set AIM4D_USE_TABPFN=1 to enable; "
                   f"requires license acceptance at priorlabs.ai)")
 
-        # Cross-validated stacking: learn optimal LR/GB weight via internal CV
         X_train_sel = X_selected[train_mask]
         y_train = y_meta[train_mask]
         w_train = train_weights[train_mask]
@@ -1199,13 +1073,11 @@ def run_ews():
 
         skf = StratifiedKFold(n_splits=n_cv_folds, shuffle=True, random_state=42)
         for fold_train, fold_val in skf.split(X_train_sel, y_train):
-            # LR fold
             lr_fold = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
             lr_fold.fit(X_train_sel[fold_train], y_train[fold_train],
                         sample_weight=w_train[fold_train])
             oof_lr[fold_val] = lr_fold.predict_proba(X_train_sel[fold_val])[:, 1]
 
-            # GB fold
             gb_fold = GradientBoostingClassifier(
                 n_estimators=100, max_depth=3, learning_rate=0.05,
                 subsample=0.8, min_samples_leaf=20, random_state=42,
@@ -1214,20 +1086,15 @@ def run_ews():
                         sample_weight=w_train[fold_train])
             oof_gb[fold_val] = gb_fold.predict_proba(X_train_sel[fold_val])[:, 1]
 
-        # Learn stacking weight via logistic on OOF predictions
         stack_X = np.column_stack([oof_lr, oof_gb])
         stack_model = LogisticRegression(C=10.0, max_iter=1000, random_state=42)
         stack_model.fit(stack_X, y_train, sample_weight=w_train)
         stack_coefs = stack_model.coef_[0]
-        # Convert to weights via softmax (LR vs GB original stacking)
         w_lr = np.exp(stack_coefs[0]) / (np.exp(stack_coefs[0]) + np.exp(stack_coefs[1]))
         w_gb = 1.0 - w_lr
         w_lr = np.clip(w_lr, 0.2, 0.8)
         w_gb = 1.0 - w_lr
 
-        # G3/G4/G6: extend stacking with optional base learners (CatBoost,
-        # TabPFN, RandomForest, ExtraTrees). Each added with diversity weight
-        # = 0.5 / (n_diverse) so the LR/GB core retains majority influence.
         components = {"lr": (w_lr, lr_risk), "gb": (w_gb, gb_risk)}
         diverse_risks = []
         diverse_names = []
@@ -1237,8 +1104,6 @@ def run_ews():
                 diverse_risks.append(r)
                 diverse_names.append(name)
         if diverse_risks:
-            # Reweight: shrink LR+GB to 0.7 total, distribute 0.3 among the
-            # diverse learners. Adjust LR/GB proportionally.
             w_lr = w_lr * 0.7
             w_gb = w_gb * 0.7
             w_each = 0.3 / len(diverse_risks)
@@ -1247,13 +1112,6 @@ def run_ews():
                 components[n] = (w_each, r)
         calibrated = sum(w * r for w, r in components.values())
 
-        # Isotonic calibration (Niculescu-Mizil & Caruana 2005) — fit on OOF
-        # blend so the calibrator never sees the rows that trained its
-        # underlying base learners. THEORETICALLY monotone-preserving, but
-        # in practice creates plateaus at the high tail that hurt AUC and
-        # AUC-PR (empirically tested: OOS AUC drops 0.06, AUC-PR 0.26).
-        # OPT-IN only — set AIM4D_ISOTONIC=1 if you want better-calibrated
-        # probabilities for Brier-score reporting and accept the AUC cost.
         if os.environ.get("AIM4D_ISOTONIC", "0") == "1":
             from sklearn.isotonic import IsotonicRegression
             from sklearn.model_selection import GroupKFold
@@ -1306,9 +1164,8 @@ def run_ews():
                                  sample_weight=w_tr[fold_tr])
                         oof_cb_full[fold_va] = cb_f.predict_proba(X_tr[fold_va])[:, 1]
                     except Exception:
-                        oof_cb_full[fold_va] = oof_gb_full[fold_va]  # graceful fallback
+                        oof_cb_full[fold_va] = oof_gb_full[fold_va]
 
-            # Blend OOF with same weights as the production ensemble
             blend_oof = (components["lr"][0] * oof_lr_full
                          + components["gb"][0] * oof_gb_full
                          + components.get("rf", (0,))[0] * oof_rf_full
@@ -1331,7 +1188,6 @@ def run_ews():
         print(f"    LR component range: [{lr_risk[train_mask].min():.4f}, {lr_risk[train_mask].max():.4f}]")
         print(f"    GB component range: [{gb_risk[train_mask].min():.4f}, {gb_risk[train_mask].max():.4f}]")
 
-        # GB feature importance
         if n_selected >= 3:
             sel_feats = [f for f, s in zip(all_meta, selected_mask) if s]
             gb_imp = dict(zip(sel_feats, meta_gb.feature_importances_))
@@ -1339,9 +1195,6 @@ def run_ews():
             for feat, imp in sorted(gb_imp.items(), key=lambda x: -x[1])[:10]:
                 print(f"    {feat}: {imp:.4f}")
 
-        # Rolling-max risk smoothing: SMOOTH_WINDOW=1 (default) = no smoothing.
-        # SMOOTH_WINDOW>=2 catches countries with sustained-elevation signals
-        # that dip below threshold in any single year.
         if SMOOTH_WINDOW >= 2:
             ews_df = ews_df.sort_values(["country_text_id", "year"]).reset_index(drop=True)
             ews_df["smoothed_risk"] = (
@@ -1353,7 +1206,6 @@ def run_ews():
         else:
             risk_for_tier = "calibrated_risk"
 
-        # Tiered alerts based on (possibly smoothed) calibrated risk
         train_risks = ews_df.loc[train_mask, risk_for_tier]
         ews_df["alert_tier"] = "none"
         ews_df.loc[ews_df[risk_for_tier] >= train_risks.quantile(WATCH_PCTL), "alert_tier"] = "watch"
@@ -1386,7 +1238,6 @@ def run_ews():
         for y in range(info["onset"] - lead, info["onset"] + 1):
             known_w[(c, y)] = True
 
-    # Episode detection by tier
     hits_by_tier = {"watch": 0, "warning": 0, "alert": 0}
     total = 0
     for country, info in KNOWN_EPISODES.items():
@@ -1407,7 +1258,7 @@ def run_ews():
             hits_by_tier[best_tier] += 1
             for lower in ["warning", "watch"]:
                 if lower != best_tier:
-                    hits_by_tier[lower] += 0  # already counted
+                    hits_by_tier[lower] += 0
         detected = best_tier != "none"
 
         source = []
@@ -1423,7 +1274,6 @@ def run_ews():
         else:
             print(f"  {country} ({info['type']} {onset}): MISSED (risk={max_risk:.3f})")
 
-    # Cumulative detection by tier
     cum_watch = sum(1 for c, info in KNOWN_EPISODES.items()
                     if ews_df[(ews_df["country_name"] == c) &
                               (ews_df["year"] >= info["onset"] - LEAD_YEARS) &
@@ -1445,8 +1295,6 @@ def run_ews():
     print(f"    Warning (top 5%): {cum_warning}/{total}")
     print(f"    Alert (top 2%):   {cum_alert}/{total}")
 
-    # Precision@K (Blair & Sambanis 2020, Ward et al. 2010)
-    # Use country-level max risk (standard: "top K countries most at risk")
     print(f"\n  Precision@K (country-level ranked risk list):")
     ews_df["label"] = ews_df.apply(lambda r: 1 if (r["country_name"], r["year"]) in known_w else 0, axis=1)
     valid = ews_df.dropna(subset=["combined_risk"])
@@ -1466,7 +1314,6 @@ def run_ews():
         lift_k = prec_k / base_rate if base_rate > 0 else 0
         print(f"    @{K:3d}: precision={prec_k:.1%}, recall={recall_k:.1%}, lift={lift_k:.1f}x")
 
-    # Standard precision/recall on tiered alerts
     alerts = ews_df[ews_df["combined_alert"]]
     tp = alerts[alerts["label"] == 1]
     fp = alerts[alerts["label"] == 0]
@@ -1512,10 +1359,8 @@ def run_ews():
             scaler_loeo = SS()
             X_scaled = scaler_loeo.fit_transform(X_loeo)
 
-            # LOEO weights (same shape as main: time-decay × pos-class upweighting)
             loeo_weights = time_weights * np.where(y_loeo == 1, POS_WEIGHT, 1.0)
 
-            # Same stacked ensemble as main model
             loeo_lr = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
             loeo_lr.fit(X_scaled[loeo_train], y_loeo[loeo_train],
                         sample_weight=loeo_weights[loeo_train])
@@ -1539,11 +1384,6 @@ def run_ews():
                 train_preds = w_lr * loeo_lr.predict_proba(X_scaled[loeo_train])[:, 1] + \
                               w_gb * loeo_gb.predict_proba(X_scaled[loeo_train])[:, 1]
 
-                # Calibrate tier thresholds against the NEGATIVE-class training
-                # distribution only — i.e., the false-positive distribution.
-                # Using all train rows (including positives) pushes thresholds up
-                # because positives have high risk, defeating the held-out
-                # episode which has no within-country training signal.
                 train_y = y_loeo[loeo_train]
                 neg_preds = train_preds[train_y == 0]
                 if len(neg_preds) >= 50:
@@ -1587,7 +1427,6 @@ def run_ews():
         loeo_df["detected_alert"] = (loeo_df["tier"] == "alert").astype(int)
         loeo_df.to_csv(os.path.join(output_dir, "loeo_results.csv"), index=False)
 
-    # Recount properly
     loeo_watch = sum(1 for r in loeo_risks if r["tier"] in ["watch", "warning", "alert"])
     loeo_warning = sum(1 for r in loeo_risks if r["tier"] in ["warning", "alert"])
     loeo_alert = sum(1 for r in loeo_risks if r["tier"] == "alert")
@@ -1598,7 +1437,6 @@ def run_ews():
     print(f"    Alert (P98):   {loeo_alert}/{loeo_total} ({loeo_alert/loeo_total:.0%})" if loeo_total > 0 else "")
     print(f"  (Each episode predicted without seeing itself)")
 
-    # LOEO stratified by episode type
     print(f"\n  LOEO stratified by episode type:")
     for ep_type in ["backsliding", "coup"]:
         type_risks = [r for r in loeo_risks
@@ -1608,7 +1446,6 @@ def run_ews():
             type_total = len(type_risks)
             print(f"    {ep_type}: {type_detected}/{type_total} ({type_detected/type_total:.0%})")
 
-    # LOEO stratified by onset era
     print(f"\n  LOEO stratified by onset era:")
     for era_label, era_start, era_end in [("pre-2005", 0, 2004), ("2005-2014", 2005, 2014),
                                            ("2015-2021", 2015, 2021), ("post-2021", 2022, 2030)]:
@@ -1629,8 +1466,6 @@ def run_ews():
     ews_eval["label"] = ews_eval.apply(
         lambda r: 1 if (r["country_name"], r["year"]) in known_w else 0, axis=1
     )
-    # Exclude post-onset country-years from continuous-risk evaluation: they are
-    # post-treatment observations, not candidates for new onset prediction.
     valid = ews_eval.dropna(subset=["csd_index"])
     valid = valid[~valid["is_postonset"]].copy()
     if valid["label"].sum() > 0 and valid["label"].nunique() > 1:
@@ -1712,7 +1547,6 @@ def run_ews():
         print(f"  Mean detection rate: {np.mean(window_detections):.0%}")
         print(f"  (This is the robust generalization estimate across 6 temporal windows)")
 
-    # Secondary OOS evaluation at TRAIN_CUTOFF (honors current cutoff, not hardcoded 2017)
     horizon = 2025 - TRAIN_CUTOFF
     print(f"\n  Secondary OOS (TRAIN_CUTOFF={TRAIN_CUTOFF}, {horizon}-year horizon):")
     oos_2017 = valid[valid["year"] > TRAIN_CUTOFF].copy()
@@ -1768,7 +1602,6 @@ def run_ews():
                   f"var_z={r['var_z']:.1f} ar1_z={r['ar1_z']:.1f} f={int(r['n_factors'])}/9{a}")
         print()
 
-    # Prospective risk ranking: 2026-2031 (Goldstone et al. 2010 format)
     print(f"\n{'='*60}")
     print(f"Prospective Risk Ranking: 2026-2031 Autocratization Risk")
     print(f"(Genuine prospective forecast — verifiable against future data)")

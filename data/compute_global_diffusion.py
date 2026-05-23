@@ -36,7 +36,6 @@ def load_iso3_mapping():
 def load_contig_pairs():
     p = os.path.join(DATA, "contiguity", "DirectContiguity320", "contdird.csv")
     if not os.path.exists(p):
-        # fall back to .dta or similar; cheap path
         for cand in ["contdird.csv", "contdir3.20.csv"]:
             q = os.path.join(DATA, "contiguity", "DirectContiguity320", cand)
             if os.path.exists(q):
@@ -45,13 +44,11 @@ def load_contig_pairs():
     if not os.path.exists(p):
         return pd.DataFrame()
     df = pd.read_csv(p, low_memory=False)
-    # contdird has 'state1no', 'state2no', 'conttype' (1-5 where lower = closer)
     df = df[df["conttype"] <= 2]
     return df[["state1no", "state2no", "year", "conttype"]]
 
 
 def load_alliance_pairs():
-    # ATOP is typically directed-dyadic; we want any active alliance per year
     p = os.path.join(DATA, "atop", "ATOP 5.1 (.csv)", "atop5_1ddyr.csv")
     if not os.path.exists(p):
         for cand in os.listdir(os.path.join(DATA, "atop", "ATOP 5.1 (.csv)")):
@@ -61,7 +58,6 @@ def load_alliance_pairs():
     if not os.path.exists(p):
         return pd.DataFrame()
     df = pd.read_csv(p, low_memory=False)
-    # canonical columns: stateA, stateB, year, atopally
     cols = {c.lower(): c for c in df.columns}
     a = cols.get("statea") or cols.get("ccode1") or cols.get("stateA")
     b = cols.get("stateb") or cols.get("ccode2") or cols.get("stateB")
@@ -85,7 +81,6 @@ def build_graph(year, contig, alliance, vdem_iso3_set):
             continue
         sub = df[df["year"] == year] if "year" in df.columns else df
         for _, r in sub.iterrows():
-            # Need to convert COW state numbers to ISO3
             pass
     return G
 
@@ -102,7 +97,6 @@ def main():
     vdem["libdem_change"] = vdem.groupby("country_text_id")["v2x_libdem"].diff()
 
     iso_map = load_iso3_mapping()
-    # Mapping CSV uses columns: country_text_id, COWcode
     cow_to_iso = dict(zip(iso_map["COWcode"], iso_map["country_text_id"]))
 
     contig = load_contig_pairs()
@@ -117,9 +111,6 @@ def main():
         alliance = alliance.dropna(subset=["iso_a", "iso_b"])
     print(f"  contig pairs: {len(contig)}; alliance pairs: {len(alliance)}")
 
-    # Pre-build edge dictionaries indexed by year for fast lookup.
-    # Contiguity edges accumulate (treat as persistent once a border exists),
-    # so we just take the cumulative set.
     print("  pre-indexing contiguity + alliance edges per year...")
     if not contig.empty:
         contig_unique = (contig[["iso_a", "iso_b"]]
@@ -138,7 +129,6 @@ def main():
     else:
         alliance_by_year = {}
 
-    # For each year, build the graph, compute PageRank, then compute exposure.
     years = sorted(vdem["year"].unique())
     rows = []
     poly_by_year = {y: g.set_index("country_text_id")["poly_change"].to_dict()
@@ -156,7 +146,6 @@ def main():
         countries = countries_by_year[year]
         country_set = set(countries)
 
-        # Build edges: contiguity (static) + alliance within +/- 5 years
         edges = set()
         for a, b in contig_set:
             if a in country_set and b in country_set:
@@ -177,11 +166,9 @@ def main():
         except Exception:
             pr = {c: 1.0 / max(len(countries), 1) for c in countries}
 
-        # lag-1 polyarchy and libdem change for each country
         poly_lag = poly_by_year.get(year - 1, {})
         libdem_lag = libdem_by_year.get(year - 1, {})
 
-        # Vectorized exposure: sum_{j != ego} PR_j * (-change_j)
         pr_arr = np.array([pr.get(c, 0.0) for c in countries])
         poly_change_arr = np.array([poly_lag.get(c, 0.0) for c in countries])
         libdem_change_arr = np.array([libdem_lag.get(c, 0.0) for c in countries])
@@ -191,7 +178,6 @@ def main():
         n_backsliders_global = int(np.sum(poly_change_arr < -0.01))
 
         for i, ego in enumerate(countries):
-            # Subtract self-contribution to get sum over j != ego
             ego_pr = pr.get(ego, 0.0)
             ep = total_exposure_poly - pr_arr[i] * (-poly_change_arr[i])
             el = total_exposure_libdem - pr_arr[i] * (-libdem_change_arr[i])

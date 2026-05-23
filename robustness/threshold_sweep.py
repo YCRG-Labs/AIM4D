@@ -175,10 +175,8 @@ def thailand_analysis(df, risk_col="combined_risk"):
         alert_str = f" [{'+'.join(alerts)}]" if alerts else ""
         print(f"    {int(row['year'])}: {vals}{alert_str}")
 
-    # What threshold would detect Thailand?
     if risk_col in pre.columns:
         max_risk = pre[risk_col].max()
-        # Compare to overall distribution
         all_risks = df[df["year"] <= TRAIN_CUTOFF][risk_col].dropna()
         pctile = (all_risks < max_risk).mean() * 100
 
@@ -187,13 +185,11 @@ def thailand_analysis(df, risk_col="combined_risk"):
         print(f"  P95 threshold: {all_risks.quantile(0.95):.4f}")
         print(f"  Gap to P95: {all_risks.quantile(0.95) - max_risk:.4f}")
 
-        # What if threshold was P94 or P93?
         for p in [95, 94, 93, 92, 90]:
             t = all_risks.quantile(p / 100)
             detected = max_risk >= t
             print(f"  At P{p} ({t:.4f}): {'DETECTED' if detected else 'MISSED'}")
 
-    # Compare to other coup episodes
     print(f"\n  Comparison to other coups:")
     for country, info in KNOWN_EPISODES.items():
         if info["type"] != "coup":
@@ -217,8 +213,6 @@ def multi_stage_threshold_sensitivity(df):
     print("MULTI-STAGE THRESHOLD SENSITIVITY")
     print(f"{'='*50}")
 
-    # Vary the CSD interpretation: how many factors need to alert
-    # We approximate this by varying what CSD index level counts as "alert"
     csd_thresholds = [1.0, 1.5, 2.0, 2.5, 3.0]
     risk_percentiles = [90, 92, 94, 95, 96, 98]
 
@@ -236,10 +230,8 @@ def multi_stage_threshold_sensitivity(df):
         for risk_p in risk_percentiles:
             risk_thresh = df[df["year"] <= TRAIN_CUTOFF]["combined_risk"].quantile(risk_p / 100)
 
-            # Combined alert: CSD above threshold OR risk above percentile
             alert = (df["csd_index"] > csd_t) | (df["combined_risk"] > risk_thresh)
 
-            # Detection rate
             hits, total = 0, 0
             for country, info in KNOWN_EPISODES.items():
                 onset = info["onset"]
@@ -251,7 +243,6 @@ def multi_stage_threshold_sensitivity(df):
                 if alert[pre.index].any():
                     hits += 1
 
-            # Precision
             tp = df[alert]["label"].sum() if "label" in df.columns else 0
             fp = alert.sum() - tp
             prec = tp / (tp + fp) if (tp + fp) > 0 else 0
@@ -271,7 +262,6 @@ def multi_stage_threshold_sensitivity(df):
 
     result = pd.DataFrame(rows)
 
-    # Print as heatmap-style table
     print(f"\n  Detection rate (rows=CSD threshold, cols=risk percentile):")
     pivot = result.pivot_table(values="detection_rate", index="csd_threshold",
                                 columns="risk_percentile", aggfunc="first")
@@ -299,43 +289,36 @@ def run_threshold_sweep():
     df = compute_labels(df)
     print(f"Loaded {len(df)} country-years, {df['label'].sum()} positive labels")
 
-    # Determine which risk column to use
     risk_col = "combined_risk"
     if risk_col not in df.columns:
         risk_col = "csd_index"
     print(f"Using risk column: {risk_col}")
 
-    # 1. Threshold sweep
     print(f"\n{'='*50}")
     print("THRESHOLD SWEEP")
     print(f"{'='*50}")
     sweep = threshold_sweep(df, risk_col)
     if len(sweep) > 0:
-        # Show key points
         print(f"\n  {'Threshold':>10}  {'Precision':>9}  {'Recall':>6}  {'F1':>5}  {'FPR':>5}  {'Flagged':>7}")
         print(f"  {'-'*50}")
         for _, row in sweep.iloc[::max(1, len(sweep) // 10)].iterrows():
             print(f"  {row['threshold']:10.3f}  {row['precision']:9.3f}  {row['recall']:6.3f}  "
                   f"{row['f1']:5.3f}  {row['fpr']:5.3f}  {int(row['n_flagged']):7d}")
 
-        # Best F1
         best = sweep.loc[sweep["f1"].idxmax()]
         print(f"\n  Best F1: {best['f1']:.3f} at threshold {best['threshold']:.3f}")
         print(f"    Precision={best['precision']:.3f}, Recall={best['recall']:.3f}")
 
-        # Stability: range of thresholds with F1 > 90% of best
         good_range = sweep[sweep["f1"] >= best["f1"] * 0.9]
         if len(good_range) > 1:
             print(f"  Thresholds within 90% of best F1: [{good_range['threshold'].min():.3f}, {good_range['threshold'].max():.3f}]")
             print(f"  {'STABLE: wide optimal range' if (good_range['threshold'].max() - good_range['threshold'].min()) > 0.5 else 'NARROW: threshold-sensitive'}")
 
-    # 2. Episode-level detection by threshold
     print(f"\n{'='*50}")
     print("EPISODE DETECTION BY THRESHOLD")
     print(f"{'='*50}")
     ep_table = detection_by_threshold(df, risk_col)
     if len(ep_table) > 0:
-        # For each episode, find the threshold at which it's lost
         print(f"\n  Episode robustness (threshold at which detection fails):")
         for country in sorted(ep_table["country"].unique()):
             ep = ep_table[ep_table["country"] == country]
@@ -348,7 +331,6 @@ def run_threshold_sweep():
             else:
                 print(f"    {country}: never detected at any tested threshold")
 
-    # 3. Calibration
     print(f"\n{'='*50}")
     print("CALIBRATION ANALYSIS")
     print(f"{'='*50}")
@@ -360,18 +342,14 @@ def run_threshold_sweep():
             print(f"  {row['mean_predicted']:10.4f}  {row['observed_freq']:10.4f}  "
                   f"{int(row['n']):6d}  {int(row['n_positive']):8d}")
 
-        # Calibration error
         cal_error = (cal["mean_predicted"] - cal["observed_freq"]).abs().mean()
         print(f"\n  Mean absolute calibration error: {cal_error:.4f}")
         print(f"  {'WELL CALIBRATED (<0.05)' if cal_error < 0.05 else 'MODERATE (0.05-0.10)' if cal_error < 0.10 else 'POORLY CALIBRATED (>0.10)'}")
 
-    # 4. Thailand analysis
     thailand_analysis(df, risk_col)
 
-    # 5. Multi-stage threshold sensitivity
     ms_result = multi_stage_threshold_sensitivity(df)
 
-    # Save everything
     if len(sweep) > 0:
         sweep.to_csv(os.path.join(OUTPUT_DIR, "threshold_sweep.csv"), index=False)
     if len(ep_table) > 0:

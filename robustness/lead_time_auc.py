@@ -57,7 +57,6 @@ def main():
     if missing:
         sys.exit(f"ews_signals.csv missing columns: {missing}. Rerun stage5_ews/estimate.py.")
 
-    # Build pre-onset lead labels per episode
     ews["years_to_onset"] = np.nan
     ews["is_episode_pre"] = False
     for country, info in KNOWN_EPISODES.items():
@@ -69,10 +68,8 @@ def main():
         ews.loc[mask, "years_to_onset"] = onset - ews.loc[mask, "year"]
         ews.loc[mask, "is_episode_pre"] = True
 
-    # Restrict to OOS year > cutoff
     oos = ews[ews["year"] > TRAIN_CUTOFF].copy()
 
-    # Exclude post-onset country-years (post-treatment) if column present
     if "is_postonset" in oos.columns:
         oos = oos[~oos["is_postonset"].fillna(False)]
 
@@ -82,7 +79,6 @@ def main():
 
     rows = []
 
-    # Aggregate OOS metric (all leads pooled) for reference
     y_all = oos["is_episode_pre"].astype(int).values
     s_all = oos["calibrated_risk"].values
     if y_all.sum() >= 2:
@@ -98,7 +94,6 @@ def main():
             "auc_pr": ap, "auc_pr_ci_low": lop, "auc_pr_ci_high": hip,
         })
 
-    # Per-lead-year decomposition: each bucket = (this-lead positives) + ALL negatives
     negatives = oos[~oos["is_episode_pre"]]
     for lead in [1, 2, 3, 4, 5]:
         positives = oos[oos["years_to_onset"] == lead]

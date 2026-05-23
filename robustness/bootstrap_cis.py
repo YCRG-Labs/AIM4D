@@ -20,7 +20,7 @@ from sklearn.metrics import (
 )
 
 
-EPS = 1e-15  # sklearn's default log_loss clip
+EPS = 1e-15
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -56,7 +56,6 @@ def _bca_ci(arr, theta_hat, jack_stats, alpha=0.05):
     a = num / den
     z_lo = float(norm.ppf(alpha / 2))
     z_hi = float(norm.ppf(1 - alpha / 2))
-    # Adjusted percentiles. Clip the denominator to avoid blow-ups.
     def _adj(z):
         denom = 1.0 - a * (z0 + z)
         if abs(denom) < 1e-6:
@@ -79,7 +78,6 @@ def bootstrap_auc(y, s, fn=roc_auc_score, n_boot=N_BOOT, clusters=None, method="
     y = np.asarray(y)
     s = np.asarray(s)
 
-    # Compute theta_hat on full data (NOT the bootstrap mean — important for BCa)
     try:
         theta_hat = float(fn(y, s))
     except Exception:
@@ -121,7 +119,6 @@ def bootstrap_auc(y, s, fn=roc_auc_score, n_boot=N_BOOT, clusters=None, method="
         lo, hi = _percentile_ci(arr)
         return theta_hat, lo, hi
 
-    # BCa: need cluster-level (or row-level) jackknife for acceleration
     jack_stats = []
     if clusters is not None:
         for c in unique:
@@ -134,7 +131,6 @@ def bootstrap_auc(y, s, fn=roc_auc_score, n_boot=N_BOOT, clusters=None, method="
             except Exception:
                 continue
     else:
-        # row-level jackknife (heavier; subsample if too many rows)
         n = len(y)
         sample_idx = np.arange(n) if n <= 500 else RNG.choice(n, size=500, replace=False)
         for i in sample_idx:
@@ -174,8 +170,6 @@ def main():
         raise RuntimeError("ews_signals.csv missing label column")
 
     valid = ews.dropna(subset=["combined_risk", "label"])
-    # Exclude post-onset country-years from CI computation (post-treatment;
-    # standard in conflict forecasting evaluation: Goldstone 2010, ViEWS)
     if "is_postonset" in valid.columns:
         valid = valid[~valid["is_postonset"]].copy()
     y = valid["label"].astype(int).values
@@ -194,16 +188,12 @@ def main():
     print(f"  AUC-PR  (in-sample, BCa cluster):  {auc_pr:.3f}  95% CI [{lo:.3f}, {hi:.3f}]")
     rows.append({"metric": "auc_pr_in_sample", "point": auc_pr, "ci_low": lo, "ci_high": hi, "n": len(y)})
 
-    # Brier + log-loss + BSS (Gneiting-Raftery 2007 proper scoring rules).
-    # BSS = 1 - Brier/Brier_climatology — the honest headline at 5% base rate
-    # because raw Brier ~0.045 looks tiny while climatology already scores ~0.0475.
     def _brier(yy, ss, ww=None):
         return brier_score_loss(yy, np.clip(ss, EPS, 1 - EPS), sample_weight=ww)
     def _logloss(yy, ss, ww=None):
         return log_loss(yy, np.clip(ss, EPS, 1 - EPS),
                         sample_weight=ww, labels=[0, 1])
     def _bss(yy, ss, ww=None):
-        # Recompute climatology reference per bootstrap replicate (anti-conservative bug fix)
         p_clim = np.average(yy, weights=ww) if ww is not None else float(yy.mean())
         ref = np.average((yy - p_clim) ** 2, weights=ww) if ww is not None else float(((yy - p_clim) ** 2).mean())
         return 1.0 - _brier(yy, ss, ww) / max(ref, EPS)
@@ -241,7 +231,6 @@ def main():
         print(f"  AUC-PR  (OOS year>{cutoff}, BCa cluster): {auc_pr:.3f}  95% CI [{lo:.3f}, {hi:.3f}]  n={len(oos)}")
         rows.append({"metric": f"auc_pr_oos_{cutoff}", "point": auc_pr, "ci_low": lo, "ci_high": hi, "n": len(oos)})
 
-        # OOS Brier + log-loss + BSS
         y_oos = oos["label"].astype(int).values
         s_oos = oos["combined_risk"].values
         c_oos = oos["country_name"].values

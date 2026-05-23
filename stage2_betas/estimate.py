@@ -225,8 +225,6 @@ def estimate_all_betas():
 
         country_betas = np.zeros((len(years), len(FACTOR_COLS)))
 
-        # dy has length T-1; dy[i] corresponds to the change from year[i] to year[i+1].
-        # Train on diffs whose right endpoint is at or before the cutoff year.
         n_pre = int((years <= MAX_TRAIN_YEAR).sum())
         n_train_diffs = max(2, n_pre - 1)
 

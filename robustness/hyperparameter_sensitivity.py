@@ -29,7 +29,6 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hyperparameter_sensitivity.csv")
 
 SWEEPS = [
-    # (name, env_var, default, alt_values)
     ("postonset_excl_years", "AIM4D_POSTONSET", 5, [3, 7]),
     ("baseline_end",         "AIM4D_BASELINE_END", 2005, [2003, 2007]),
     ("lead_years",           "AIM4D_LEAD_YEARS", 5, [4, 6]),
@@ -56,7 +55,6 @@ def parse_metrics(log):
     if m: out["oos_auc"] = float(m.group(1))
     m = re.search(r"AUC-PR \(OOS\):\s+([\d.]+)", log)
     if m: out["oos_auc_pr"] = float(m.group(1))
-    # In-sample AUC: anchored to "Base rate" line in the Continuous-risk block
     m = re.search(r"Base rate.*?AUC-ROC:\s+([\d.]+)", log, re.DOTALL)
     if m: out["in_sample_auc"] = float(m.group(1))
     m = re.search(r"Base rate.*?AUC-PR:\s+([\d.]+)", log, re.DOTALL)
@@ -75,7 +73,6 @@ def parse_metrics(log):
 def main():
     rows = []
 
-    # First the baseline run with all defaults
     print(f"\n*** BASELINE (all defaults) ***")
     log = run_stage5({})
     m = parse_metrics(log)
@@ -83,7 +80,6 @@ def main():
     m["param_value"] = "default"
     rows.append(m)
 
-    # Then one-at-a-time variations
     for name, env_var, default, alts in SWEEPS:
         for val in alts:
             print(f"\n*** {name} = {val} (default {default}) ***")

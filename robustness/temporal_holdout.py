@@ -32,7 +32,7 @@ from sklearn.metrics import (
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from bootstrap_cis import bootstrap_auc  # noqa: E402
+from bootstrap_cis import bootstrap_auc
 
 EWS = os.path.join(REPO, "stage5_ews", "ews_signals.csv")
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temporal_holdout.csv")
@@ -73,7 +73,6 @@ def main():
     if "is_postonset" in valid.columns:
         valid = valid[~valid["is_postonset"].fillna(False)]
 
-    # Build partitions
     train = valid[valid["year"] <= TRAIN_END]
     calib = valid[(valid["year"] >= CALIB_START) & (valid["year"] <= CALIB_END)]
     test = valid[valid["year"] >= TEST_START]

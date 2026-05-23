@@ -74,7 +74,6 @@ def evaluate(risk, df, y):
     auc = roc_auc_score(y[valid], risk[valid])
     ap = average_precision_score(y[valid], risk[valid])
 
-    # Honor TRAIN_CUTOFF and exclude post-onset country-years if available
     oos = (df["year"] > TRAIN_CUTOFF).values & valid
     if "is_postonset" in df.columns:
         oos = oos & (~df["is_postonset"].fillna(False).values)

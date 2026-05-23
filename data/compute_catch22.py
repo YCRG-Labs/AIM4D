@@ -24,7 +24,7 @@ except ImportError:
 
 DATA = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DATA, "catch22_features.csv")
-WINDOW = 10  # rolling window length
+WINDOW = 10
 
 
 def rolling_catch22(series, window=WINDOW):
@@ -64,9 +64,6 @@ def main():
             continue
 
         poly = grp["v2x_polyarchy"].values
-        # ffill only — bfill would use future libdem to fill past gaps.
-        # Pre-coverage NaN replaced with 0.0 sentinel (catch22 then sees a
-        # constant baseline, which it correctly summarises as low entropy).
         libdem = grp["v2x_libdem"].ffill().fillna(0.0).values
 
         poly_feats = rolling_catch22(poly)
@@ -83,7 +80,6 @@ def main():
             print(f"  {i}/{n_countries} countries done")
 
     out = pd.DataFrame(rows)
-    # Drop columns that are entirely NaN
     out = out.dropna(axis=1, how="all")
     out.to_csv(OUT, index=False)
     print(f"\nWrote {OUT}: {len(out)} rows, {out.shape[1]-2} features, "

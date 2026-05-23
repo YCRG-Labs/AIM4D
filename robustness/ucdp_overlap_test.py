@@ -26,13 +26,11 @@ import pandas as pd
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
-from stage5_ews.estimate import KNOWN_EPISODES  # noqa: E402
+from stage5_ews.estimate import KNOWN_EPISODES
 
 UCDP_CSV = os.path.join(REPO, "data", "ucdp_ged.csv")
 OUT_CSV = os.path.join(REPO, "robustness", "ucdp_overlap_test.csv")
 
-# UCDP country name differs from V-Dem on these. UCDP-GED uses the country
-# field; V-Dem ERT key (our KNOWN_EPISODES) uses country_name. Map both ways.
 COUNTRY_ALIASES = {
     "Burma/Myanmar": ["Myanmar (Burma)", "Myanmar"],
     "Türkiye": ["Turkey"],
@@ -68,24 +66,20 @@ def load_ucdp_country_year():
     df = pd.read_csv(UCDP_CSV, low_memory=False)
     print(f"Loaded UCDP-GED: {len(df)} events, {df['year'].min()}-{df['year'].max()}")
 
-    # Type of violence: 1=state-based, 2=non-state, 3=one-sided
     if "type_of_violence" in df.columns:
         df = df[df["type_of_violence"] == 1]
         print(f"  state-based events: {len(df)}")
 
-    # Aggregate to (country, year) and sum best-estimate fatalities
     if "best" in df.columns:
         cy = (df.groupby(["country", "year"])["best"]
                 .sum()
                 .reset_index()
                 .rename(columns={"best": "fatalities"}))
     else:
-        # fallback: count events as a proxy
         cy = (df.groupby(["country", "year"])
                 .size()
                 .reset_index(name="event_count"))
         cy["fatalities"] = cy["event_count"] * 5
-    # Standard 25-deaths/year threshold for "active" state conflict
     cy["had_state_conflict"] = (cy["fatalities"] >= 25).astype(int)
     print(f"  country-years with active state conflict: {cy['had_state_conflict'].sum()}")
     return cy

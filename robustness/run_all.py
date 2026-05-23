@@ -121,7 +121,6 @@ def run_all(fast=False, only=None):
 
     total_time = time.time() - total_start
 
-    # Print summary
     print(f"\n{'=' * 70}")
     print("ROBUSTNESS SUITE SUMMARY")
     print(f"{'=' * 70}")
@@ -136,7 +135,6 @@ def run_all(fast=False, only=None):
     n_total = len(results)
     print(f"\n  {n_success}/{n_total} checks passed")
 
-    # List output files
     print(f"\nOutput files:")
     for f in sorted(os.listdir(OUTPUT_DIR)):
         if f.endswith(".csv"):

@@ -23,7 +23,7 @@ except ImportError:
 
 DATA = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DATA, "changepoints.csv")
-WINDOW = 30  # trailing years used per (country, year) PELT fit
+WINDOW = 30
 
 
 def detect_breaks_in_window(series, penalty=0.05, model="l2", min_size=4):
@@ -34,7 +34,6 @@ def detect_breaks_in_window(series, penalty=0.05, model="l2", min_size=4):
     try:
         algo = rpt.Pelt(model=model, min_size=min_size, jump=1).fit(x)
         bkps = algo.predict(pen=penalty)
-        # bkps includes the endpoint; trim it
         return [b for b in bkps if 0 < b < len(x)]
     except Exception:
         return []
@@ -53,16 +52,14 @@ def years_since_last_break_prospective(series, years, window=WINDOW,
         start = max(0, t - window + 1)
         chunk = series[start:t + 1]
         chunk_years = years[start:t + 1]
-        # need enough non-nan points for PELT to fit
         valid = ~np.isnan(chunk)
         if valid.sum() < min_size * 2:
             continue
         bkps = detect_breaks_in_window(chunk[valid], penalty=penalty, min_size=min_size)
         valid_years = chunk_years[valid]
-        # Translate breakpoint indices (in valid-subset) back to actual years
         break_years = [int(valid_years[b]) for b in bkps if b < len(valid_years)]
         if break_years:
-            last_break = max(break_years)  # most recent within window
+            last_break = max(break_years)
             yss[t] = int(years[t]) - last_break
             if 0 <= int(years[t]) - last_break <= 2:
                 win3[t] = 1
@@ -87,7 +84,6 @@ def main():
             continue
 
         poly = grp["v2x_polyarchy"].values
-        # ffill only for libdem within country (no future leakage)
         libdem = grp["v2x_libdem"].ffill().fillna(0.0).values
 
         yss_p, w3_p = years_since_last_break_prospective(poly, years)

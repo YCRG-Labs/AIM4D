@@ -62,13 +62,11 @@ def load_data():
 
 def identify_fps(ews, vdem):
     """Identify all false positive alerts and classify them."""
-    # Build known episode windows
     known_w = {}
     for c, info in KNOWN_EPISODES.items():
         for y in range(info["onset"] - LEAD_YEARS, info["onset"] + 1):
             known_w[(c, y)] = True
 
-    # Identify alert column
     alert_col = "combined_alert" if "combined_alert" in ews.columns else "ews_alert"
     risk_col = "combined_risk" if "combined_risk" in ews.columns else "csd_index"
 
@@ -82,16 +80,13 @@ def identify_fps(ews, vdem):
     print(f"True positives: {alerts['is_tp'].sum()}")
     print(f"False positives: {len(fps)}")
 
-    # Merge polyarchy data
     vdem_sub = vdem[["country_name", "year", "v2x_polyarchy"]].copy()
 
-    # For each FP, compute polyarchy change in a 5-year window
     fp_rows = []
     for _, fp_row in fps.iterrows():
         country = fp_row["country_name"]
         year = fp_row["year"]
 
-        # Polyarchy at alert time and 5 years later
         poly_now = vdem_sub[(vdem_sub["country_name"] == country) &
                             (vdem_sub["year"] == year)]["v2x_polyarchy"]
         poly_after = vdem_sub[(vdem_sub["country_name"] == country) &
@@ -102,14 +97,12 @@ def identify_fps(ews, vdem):
         poly_min_after = poly_after.min() if len(poly_after) > 0 else np.nan
         poly_change = poly_min_after - poly_val if not np.isnan(poly_val) and not np.isnan(poly_min_after) else np.nan
 
-        # Check if an episode started within 3 years after the alert
         temporal_near_miss = False
         for ep_country, ep_info in KNOWN_EPISODES.items():
             if ep_country == country and year < ep_info["onset"] <= year + 3:
                 temporal_near_miss = True
                 break
 
-        # Classify FP type
         if temporal_near_miss:
             fp_type = "temporal_near_miss"
         elif not np.isnan(poly_change) and poly_change < -0.05:
@@ -157,7 +150,6 @@ def run_false_positive_analysis():
         print("\nNo false positives found.")
         return pd.DataFrame()
 
-    # Summary by FP type
     print(f"\n{'='*50}")
     print("FALSE POSITIVE CLASSIFICATION")
     print(f"{'='*50}")
@@ -168,7 +160,6 @@ def run_false_positive_analysis():
         pct = count / total_fp * 100
         print(f"  {fp_type}: {count} ({pct:.1f}%)")
 
-    # Temporal near-misses (these are arguably successes)
     temporal_nm = fp_table[fp_table["fp_type"] == "temporal_near_miss"]
     if len(temporal_nm) > 0:
         print(f"\n  Temporal near-misses (episode within 3yr after alert):")
@@ -176,7 +167,6 @@ def run_false_positive_analysis():
             print(f"    {row['country_name']} ({int(row['year'])}): "
                   f"polyarchy change = {row['polyarchy_change_5yr']:.3f}")
 
-    # Near-misses (polyarchy declined >0.05)
     near_miss = fp_table[fp_table["fp_type"] == "near_miss"]
     if len(near_miss) > 0:
         print(f"\n  Near-misses (polyarchy declined >0.05 within 5yr):")
@@ -186,7 +176,6 @@ def run_false_positive_analysis():
                   f"change {row['polyarchy_change_5yr']:.3f}, "
                   f"risk={row['risk_score']:.2f}")
 
-    # True false positives
     true_fp = fp_table[fp_table["fp_type"] == "true_fp"]
     if len(true_fp) > 0:
         print(f"\n  True false positives (no deterioration):")
@@ -196,19 +185,16 @@ def run_false_positive_analysis():
             print(f"    {row['country_name']} ({int(row['year'])}): "
                   f"{poly_str}, {change_str}, risk={row['risk_score']:.2f}")
 
-    # Stable democracy FPs
     stable_fp = fp_table[fp_table["is_stable_democracy"]]
     print(f"\n  Stable democracy false alarms: {len(stable_fp)}")
     if len(stable_fp) > 0:
         for _, row in stable_fp.drop_duplicates("country_name").iterrows():
             print(f"    {row['country_name']} ({int(row['year'])}): risk={row['risk_score']:.2f}")
 
-    # Effective precision (excluding near-misses as "FPs")
     n_temporal_nm = len(fp_table[fp_table["fp_type"] == "temporal_near_miss"])
     n_near_miss = len(fp_table[fp_table["fp_type"] == "near_miss"])
     n_true_fp = len(fp_table[fp_table["fp_type"].isin(["true_fp", "stable_democracy_fp"])])
 
-    # Recount TPs
     alert_col = "combined_alert" if "combined_alert" in ews.columns else "ews_alert"
     known_w = {}
     for c, info in KNOWN_EPISODES.items():
@@ -228,12 +214,10 @@ def run_false_positive_analysis():
     print(f"    Near-misses reclassified as useful: {n_temporal_nm + n_near_miss}")
     print(f"    Genuine false alarms: {n_true_fp}")
 
-    # Regional distribution
     print(f"\n{'='*50}")
     print("REGIONAL DISTRIBUTION OF FPs")
     print(f"{'='*50}")
 
-    # Add crude region
     region_map = {}
     for _, row in fp_table.iterrows():
         iso = row.get("country_text_id", "")
@@ -249,7 +233,6 @@ def run_false_positive_analysis():
     for region, row in region_dist.head(10).iterrows():
         print(f"  {region}: {row['n_fps']} FP alerts across {row['n_countries']} countries")
 
-    # Risk score distribution: TPs vs FPs
     print(f"\n{'='*50}")
     print("RISK SCORE DISTRIBUTION: TPs vs FPs")
     print(f"{'='*50}")
@@ -257,7 +240,6 @@ def run_false_positive_analysis():
     risk_col = "risk_score"
     if risk_col in fp_table.columns:
         fp_risk = fp_table[risk_col].dropna()
-        # Get TP risks for comparison
         tp_alerts = alerts[alerts.apply(lambda r: (r["country_name"], r["year"]) in known_w, axis=1)]
         tp_risk_col = "combined_risk" if "combined_risk" in tp_alerts.columns else "csd_index"
         tp_risk = tp_alerts[tp_risk_col].dropna() if tp_risk_col in tp_alerts.columns else pd.Series()
@@ -269,7 +251,6 @@ def run_false_positive_analysis():
             print(f"  TP risk scores: median={tp_risk.median():.3f}, mean={tp_risk.mean():.3f}, "
                   f"range=[{tp_risk.min():.3f}, {tp_risk.max():.3f}]")
         if len(fp_risk) > 0 and len(tp_risk) > 0:
-            # Separation
             from scipy.stats import mannwhitneyu
             try:
                 stat, p = mannwhitneyu(tp_risk, fp_risk, alternative="greater")
@@ -278,10 +259,8 @@ def run_false_positive_analysis():
             except Exception:
                 pass
 
-    # Save full FP table
     fp_table.to_csv(os.path.join(OUTPUT_DIR, "false_positive_table.csv"), index=False)
 
-    # Save summary
     summary = pd.DataFrame([{
         "total_alerts": n_tp + total_fp,
         "true_positives": n_tp,

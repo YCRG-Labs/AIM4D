@@ -1,0 +1,6 @@
+country,onset,type,full_pipeline_max_risk,full_pipeline_tier,meta_only_max_risk,meta_only_tier,delta_risk,tier_breakdown
+Hungary,2010,backsliding,0.1055940156217115,watch,0.1557686504416585,watch,-0.050174634819946995,"{'watch': 3, 'none': 2}"
+Türkiye,2013,backsliding,0.2681306103746565,warning,0.2298774727810221,warning,0.03825313759363441,"{'warning': 3, 'watch': 2}"
+Burma/Myanmar,2021,coup,0.3047946431890776,warning,0.1744715285602926,warning,0.13032311462878501,"{'watch': 4, 'warning': 1}"
+Mali,2020,coup,0.0761683501825314,none,0.0804276515409471,watch,-0.004259301358415693,{'none': 5}
+Nigeria,2021,backsliding,0.1752147847233263,warning,0.1465760964708878,watch,0.02863868825243851,"{'watch': 4, 'warning': 1}"

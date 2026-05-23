@@ -35,7 +35,7 @@ POLITY_URLS = [
 
 FH_SUBQS = [f"{g}{i}" for g, n in [("A", 3), ("B", 4), ("C", 3), ("D", 4),
                                     ("E", 3), ("F", 4), ("G", 4)]
-            for i in range(1, n + 1)]  # A1..A3, B1..B4, ..., G1..G4 = 25
+            for i in range(1, n + 1)]
 POLITY_COMPONENTS = ["xrcomp", "xropen", "xconst", "parreg", "parcomp"]
 
 
@@ -62,16 +62,13 @@ def download_fh():
               "https://freedomhouse.org/report/freedom-world and place at "
               f"{FH_OUT.replace('.csv', '.xlsx')}")
         return
-    # FH 'All Data' is multi-sheet; the per-country sheet is usually 'FIW13-24' or similar
     xls = pd.ExcelFile(io.BytesIO(data))
-    # pick the sheet with the most rows (the country-year data sheet)
     best_sheet, best_n = None, 0
     for sh in xls.sheet_names:
         tmp = pd.read_excel(xls, sheet_name=sh, header=1, nrows=5)
         if tmp.shape[1] > best_n:
             best_sheet, best_n = sh, tmp.shape[1]
     df = pd.read_excel(xls, sheet_name=best_sheet, header=1)
-    # Standard FH columns: 'Country/Territory', 'Edition' (= year), plus A1..G4
     df.columns = [str(c).strip() for c in df.columns]
     country_col = next((c for c in df.columns if "Country" in c), df.columns[0])
     year_col = next((c for c in df.columns if c in ("Edition", "Year")), None)

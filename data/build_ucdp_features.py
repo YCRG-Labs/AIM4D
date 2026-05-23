@@ -35,19 +35,17 @@ COW_MAP = os.path.join(DATA, "cow_iso3_mapping.csv")
 CONTIG_CSV = os.path.join(DATA, "contiguity", "DirectContiguity320", "contdird.csv")
 OUT = os.path.join(DATA, "ucdp_features.csv")
 
-# Hand-curated overrides where Gleditsch-Ward ≠ COW or V-Dem coding diverges.
-# Audit: unmapped GW codes after this should be micro-states only.
 GW_OVERRIDES = {
-    345: "SRB",   # Yugoslavia / Serbia successor
-    347: "KOS",   # Kosovo (post-2008)
-    340: "SRB",   # pre-2006 SFRY collapses to Serbia (V-Dem convention)
-    626: "SSD",   # South Sudan (post-2011)
-    625: "SDN",   # Sudan
-    679: "YEM",   # Yemen (unified 1990+)
-    818: "VNM",   # Vietnam
-    315: "CZE",   # Czechoslovakia -> Czechia post-1993
-    260: "DEU",   # FRG -> Germany post-1990
-    265: "DEU",   # GDR -> Germany post-1990
+    345: "SRB",
+    347: "KOS",
+    340: "SRB",
+    626: "SSD",
+    625: "SDN",
+    679: "YEM",
+    818: "VNM",
+    315: "CZE",
+    260: "DEU",
+    265: "DEU",
 }
 
 YEAR_MIN = 1989
@@ -60,10 +58,9 @@ def _load_ucdp_country_year():
     df = pd.read_csv(UCDP_CSV, low_memory=False)
     print(f"Loaded UCDP-GED: {len(df)} events, {df['year'].min()}-{df['year'].max()}")
 
-    df = df[df["type_of_violence"] == 1]                    # state-based only
+    df = df[df["type_of_violence"] == 1]
     print(f"  state-based events: {len(df)}")
 
-    # Bridge GW country_id -> country_text_id
     cow = pd.read_csv(COW_MAP).set_index("COWcode")["country_text_id"]
     df["country_text_id"] = df["country_id"].map(GW_OVERRIDES).fillna(
         df["country_id"].map(cow))
@@ -73,7 +70,6 @@ def _load_ucdp_country_year():
         print(f"    sample: {unmapped['country_id'].value_counts().head().to_dict()}")
         df = df.dropna(subset=["country_text_id"])
 
-    # Aggregate to country-year fatalities
     cy = (df.groupby(["country_text_id", "year"])["best"]
             .sum()
             .reset_index()
@@ -83,7 +79,6 @@ def _load_ucdp_country_year():
 
 def _expand_to_balanced_panel(cy):
     """Expand to balanced (country_text_id × year) panel covering all V-Dem countries."""
-    # Read V-Dem to get the canonical country list and active years
     vdem_path = os.path.join(DATA, "vdem_v16.csv")
     vdem = pd.read_csv(vdem_path, usecols=["country_text_id", "year"], low_memory=False)
     vdem = vdem[(vdem["year"] >= YEAR_MIN) & (vdem["year"] <= YEAR_MAX)]
@@ -99,30 +94,25 @@ def _compute_country_features(panel):
     panel["active"] = (panel["bd"] >= 25).astype(int)
     g = panel.groupby("country_text_id", group_keys=False)
 
-    # Past-only lags
     panel["active_lag1"] = g["active"].shift(1)
     panel["active_lag2"] = g["active"].shift(2)
     panel["active_lag3"] = g["active"].shift(3)
     panel["bd_lag1"] = g["bd"].shift(1)
 
-    # Hegre-style onset: active in y-1 AND inactive y-2 and y-3
     panel["ucdp_onset_lag1"] = (
         (panel["active_lag1"] == 1)
         & (panel["active_lag2"].fillna(0) == 0)
         & (panel["active_lag3"].fillna(0) == 0)
     ).astype(int)
 
-    # active-5y: rolling-max over the SHIFTED series so y is never included
     panel["ucdp_active_5y"] = (
         g["active"].shift(1)
         .rolling(5, min_periods=1).max()
         .reset_index(level=0, drop=True)
     ).fillna(0).astype(int)
 
-    # log fatalities (lag1)
     panel["ucdp_log_bd_lag1"] = np.log1p(panel["bd_lag1"].fillna(0.0))
 
-    # Years-since-onset: count years since last onset==1 in past, cap at 25
     def _yso(s):
         last = -9999
         out = np.zeros(len(s), dtype=int)
@@ -145,12 +135,9 @@ def _load_neighbors():
         print(f"  Contiguity file not found at {CONTIG_CSV}; skipping neighbor features")
         return None
     cont = pd.read_csv(CONTIG_CSV)
-    # Direct contiguity types: 1=land, 2=<=12mi sea, 3=12-24mi sea, 4=24-150mi sea
-    # 5 = 150-400mi sea (mostly not contiguous in our sense). Keep <=4.
     if "conttype" in cont.columns:
         cont = cont[cont["conttype"] <= 4]
 
-    # Map state numbers (COW) -> ISO3
     cow = pd.read_csv(COW_MAP).set_index("COWcode")["country_text_id"]
     cont["iso_a"] = cont["state1no"].map(cow)
     cont["iso_b"] = cont["state2no"].map(cow)
@@ -170,7 +157,6 @@ def _compute_neighbor_features(panel, neigh):
         panel["ucdp_neighbor_log_bd_lag1"] = 0.0
         return panel
 
-    # Pivot to wide form for fast neighbor lookups
     onset_wide = panel.pivot(index="country_text_id", columns="year",
                               values="ucdp_onset_lag1").fillna(0.0)
     bd_wide = panel.pivot(index="country_text_id", columns="year",

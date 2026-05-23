@@ -80,7 +80,6 @@ def main():
         print("  Rebuilding label / is_postonset columns from KNOWN_EPISODES")
         ews = build_label_columns(ews)
 
-    # Restrict to DSP coverage window (matches Stage 5)
     ews = ews[ews["year"] >= 2000].reset_index(drop=True)
 
     features = [c for c in ews.columns
@@ -97,7 +96,6 @@ def main():
     scaler.fit(X[train_mask])
     Xs = scaler.transform(X)
 
-    # Match the Stage 5 stacked ensemble (LR + 20-seed GB + RF + ET + CatBoost)
     max_year = int(ews.loc[train_mask, "year"].max())
     time_weights = np.exp(-np.log(2) * (max_year - ews["year"].values) / 8.0)
     train_w = time_weights * np.where(y == 1, POS_WEIGHT, 1.0)
@@ -147,7 +145,6 @@ def main():
 
     lr_pred = lr.predict_proba(Xs)[:, 1]
 
-    # Diversity weights matching Stage 5 (0.14, 0.56, 0.1, 0.1, 0.1)
     if have_cb:
         ens = 0.14 * lr_pred + 0.56 * gb_pred + 0.10 * rf_pred + 0.10 * et_pred + 0.10 * cb_pred
     else:
@@ -158,8 +155,6 @@ def main():
     print(f"\nBaseline OOS AUC: {baseline_auc:.4f}  AUC-PR: {baseline_ap:.4f}")
     print(f"\nPermutation importance with {N_PERMS} shuffles per feature...")
 
-    # Keep the trained GB models so we can re-predict with perturbed X
-    # without refitting (would be 20x more expensive per feature).
     trained_gb_models = []
     for seed in range(N_GB):
         gb = GradientBoostingClassifier(

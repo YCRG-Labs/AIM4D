@@ -40,11 +40,11 @@ import pandas as pd
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
-from stage1_factors.extract import (  # noqa: E402
+from stage1_factors.extract import (
     load_vdem, select_indicators, build_panel, panel_to_matrix, varimax,
     bai_ng_ic,
 )
-from scipy import linalg as sla  # noqa: E402
+from scipy import linalg as sla
 
 
 def fast_factors(X, K):
@@ -67,8 +67,6 @@ K = 4
 N_BOOT = 200
 RNG = np.random.default_rng(42)
 
-# V-Dem high-level component prefixes for leave-one-component-out.
-# Indicators matching these substrings get dropped as a group.
 VDEM_COMPONENTS = {
     "electoral":     ["v2el", "v2x_elecreg", "v2xel", "v2x_polyarchy", "v2x_EDcomp"],
     "liberal":       ["v2x_liberal", "v2xcl", "v2cl", "v2x_clpol", "v2x_clpriv", "v2juncind", "v2x_jucon"],
@@ -89,7 +87,7 @@ def tucker_congruence(a, b):
     return float(abs(a @ b) / denom)
 
 
-_PANEL_CACHE = {}  # full interpolated panel, built once
+_PANEL_CACHE = {}
 
 
 def _cached_panel(df, indicators):
@@ -151,20 +149,16 @@ def compare_to_base(base_loadings, base_f1, indicators_kept, df, want_K=False,
     if loadings_r is None:
         return np.nan, np.nan, np.nan
 
-    # Restrict original loadings to the shared (kept) indicators
     shared = [c for c in indicators_kept if c in base_loadings.index]
-    L0_shared = base_loadings.loc[shared].values         # (n_shared, K)
-    Lr = loadings_r.loc[shared].values                   # (n_shared, K)
+    L0_shared = base_loadings.loc[shared].values
+    Lr = loadings_r.loc[shared].values
 
-    # Procrustes-align refit loadings to original, then pick the refit column
-    # most congruent with original factor-1.
     R = procrustes_align(L0_shared, Lr)
     Lr_aligned = Lr @ R
     congruences = [tucker_congruence(L0_shared[:, 0], Lr_aligned[:, c]) for c in range(K)]
     j = int(np.argmax(congruences))
     phi = congruences[j]
 
-    # Factor-score correlation on common (country, year)
     fr = fscores_r[["country_name", "year", f"f{j+1}"]].rename(columns={f"f{j+1}": "fr"})
     merged = base_f1.merge(fr, on=["country_name", "year"], how="inner")
     if len(merged) > 10:
@@ -246,7 +240,6 @@ def main():
     print(f"\nBase: {len(indicators)} indicators, K={K}, "
           f"{len(base_fscores)} country-years")
 
-    # Identify top loaders on factor-1
     top_loaders = base_loadings["f1"].abs().sort_values(ascending=False)
     print(f"\nTop-10 factor-1 loaders:")
     for ind, val in top_loaders.head(10).items():
@@ -254,7 +247,6 @@ def main():
 
     rows = []
 
-    # --- Tier 1: leave-one-component-out ---
     print(f"\n--- Tier 1: leave-one-component-out ---")
     for comp, prefixes in VDEM_COMPONENTS.items():
         drop = [c for c in indicators if any(c.startswith(p) or p in c for p in prefixes)]
@@ -267,7 +259,6 @@ def main():
                      "phi": phi, "score_r": r, "K_selected": k})
         print(f"  drop {comp:14s} (-{len(drop):3d}): phi={phi:.4f}  r={r:.4f}  K={k}")
 
-    # --- Tier 2: drop-top-loaders (with Procrustes-inflation check) ---
     print(f"\n--- Tier 2: drop-top-loaders (+ non-Procrustes phi check) ---")
     for n_top in [5, 10]:
         drop = top_loaders.head(n_top).index.tolist()
@@ -280,7 +271,6 @@ def main():
                      "score_r": r, "K_selected": k})
         print(f"  drop top-{n_top:2d}: phi={phi:.4f} (no-Procrustes {phi_direct:.4f})  r={r:.4f}  K={k}")
 
-    # --- Tier 3: random-subset bootstrap ---
     print(f"\n--- Tier 3: random-subset bootstrap (drop 20%, {N_BOOT} reps) ---")
     boot_phis = []
     for b in range(N_BOOT):
@@ -299,7 +289,6 @@ def main():
     print(f"  bootstrap phi: mean={boot_phis.mean():.4f}  "
           f"min={boot_phis.min():.4f}  5th-pct={np.percentile(boot_phis, 5):.4f}")
 
-    # --- Tier 4: leave-one-indicator-out (report min) ---
     print(f"\n--- Tier 4: leave-one-indicator-out (min phi across {len(indicators)}) ---")
     loio_phis = []
     for c in indicators:
@@ -313,11 +302,7 @@ def main():
                  "phi": float(loio_phis.min()), "score_r": np.nan, "K_selected": np.nan})
     print(f"  LOIO phi: min={loio_phis.min():.4f}  mean={loio_phis.mean():.4f}")
 
-    # --- Tier 5: sequential family ablation (adversarial) ---
     print(f"\n--- Tier 5: sequential family ablation (drop whole families) ---")
-    # Order families by factor-1 loading mass they carry (descending), then
-    # drop them cumulatively. Removing a whole family also removes its proxies,
-    # so this defeats the redundancy that makes single-indicator drops trivial.
     fam_mass = {}
     fam_members = {}
     for comp, prefixes in VDEM_COMPONENTS.items():
@@ -351,7 +336,6 @@ def main():
     else:
         print(f"  breaking point: factor-1 falls below phi=0.95 after dropping '{break_point}'")
 
-    # --- Tier 6: split-half reliability (adversarial) ---
     print(f"\n--- Tier 6: split-half reliability (disjoint halves, {N_BOOT} reps) ---")
     sh = split_half_reliability(df, indicators, base_f1, N_BOOT, RNG)
     rows.append({"tier": "split_half_reliability", "config": f"halves_x{len(sh)}",
@@ -366,7 +350,6 @@ def main():
     df_out = pd.DataFrame(rows)
     df_out.to_csv(OUT, index=False)
 
-    # --- Verdict ---
     print(f"\n{'=' * 70}")
     print("VERDICT")
     print("=" * 70)

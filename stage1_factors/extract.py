@@ -194,9 +194,6 @@ def extract_factors(min_year=MIN_YEAR, max_train_year=MAX_TRAIN_YEAR, k_max=K_MA
     panel = build_panel(df, indicators, min_year)
     X, scaler = panel_to_matrix(panel, indicators)
 
-    # Fit POET loadings only on pre-cutoff data; project post-cutoff country-years
-    # using those loadings. Honors the temporal hold-out: no post-cutoff V-Dem rows
-    # contribute to the latent factor structure.
     train_mask = panel["year"].values <= max_train_year
     if EXCLUDE_COUNTRY:
         train_mask = train_mask & (panel["country_name"].values != EXCLUDE_COUNTRY)
@@ -233,8 +230,6 @@ def extract_factors(min_year=MIN_YEAR, max_train_year=MAX_TRAIN_YEAR, k_max=K_MA
                 result["loadings"][:, k] *= -1
                 result["factors"][:, k] *= -1
 
-    # Project the FULL panel (incl. post-cutoff country-years) onto factors
-    # using the sign-corrected loadings fit on the training subset.
     rotated_loadings = result["loadings"]
     proj = np.linalg.lstsq(
         rotated_loadings.T @ rotated_loadings,

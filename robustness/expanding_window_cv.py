@@ -27,8 +27,6 @@ from sklearn.metrics import roc_auc_score, average_precision_score
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.dirname(os.path.abspath(__file__))
 
-# Expanding-window cutoffs. Each fold trains on year <= cutoff, evaluates the
-# next 3-year window (cutoff+1 .. cutoff+3) as the OOS slice.
 CUTOFFS = [2008, 2011, 2014, 2017]
 LEAD = 5
 

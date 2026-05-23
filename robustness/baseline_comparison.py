@@ -55,7 +55,6 @@ def load_all_data():
     """Load and merge all pipeline stage outputs into a single panel."""
     base = os.path.join(os.path.dirname(__file__), "..")
 
-    # V-Dem raw
     vdem_path = os.path.join(base, "data", "vdem_v16.csv")
     vdem_cols = ["country_name", "country_text_id", "year", "v2x_polyarchy", "v2x_regime",
                  "v2x_libdem", "v2x_partipdem", "v2x_egaldem"]
@@ -64,7 +63,6 @@ def load_all_data():
     vdem = pd.read_csv(vdem_path, low_memory=False, usecols=vdem_cols)
     vdem = vdem[vdem["year"] >= 1990]
 
-    # Macro
     macro_path = os.path.join(base, "data", "macro_covariates.csv")
     macro = pd.read_csv(macro_path) if os.path.exists(macro_path) else None
     if macro is not None:
@@ -76,30 +74,24 @@ def load_all_data():
             vdem[c] = vdem[c].fillna(vdem[c].median())
         vdem["log_gdp_pc"] = np.log1p(vdem.get("gdp_pc", 0))
 
-    # Neighborhood polyarchy (region average proxy)
     vdem["region"] = vdem["country_text_id"].str[:2]
     vdem["neighbor_polyarchy"] = vdem.groupby(["region", "year"])["v2x_polyarchy"].transform("mean")
 
-    # Stage 1: POET factors
     factors = pd.read_csv(os.path.join(base, "stage1_factors", "country_year_factors.csv"))
     factor_cols = [c for c in factors.columns if c.startswith("factor_")]
 
-    # Stage 3: HMM states
     states = pd.read_csv(os.path.join(base, "stage3_msvar", "country_year_states.csv"))
     state_cols = [c for c in states.columns if c.startswith("prob_state_")]
 
-    # Stage 4: Contagion
     contagion_path = os.path.join(base, "stage4_nscm", "contagion_scores.csv")
     contagion = pd.read_csv(contagion_path) if os.path.exists(contagion_path) else None
 
-    # Stage 5: EWS (run full to get calibrated risk)
     try:
         from stage5_ews.estimate import run_ews
         ews = run_ews()
     except Exception:
         ews = pd.read_csv(os.path.join(base, "stage5_ews", "ews_signals.csv"))
 
-    # Merge all
     panel = vdem.copy()
     panel = panel.merge(factors[["country_text_id", "year"] + factor_cols],
                         on=["country_text_id", "year"], how="left")
@@ -189,20 +181,15 @@ def run_baseline_comparison():
 
     all_results = []
 
-    # ================================================================
-    # TABLE 1: EXTERNAL BASELINES
-    # ================================================================
     print(f"{'='*60}")
     print("TABLE 1: External Baselines")
     print(f"{'='*60}\n")
 
-    # 1a. Logistic on polyarchy + GDP
     b1_feats = [c for c in ["v2x_polyarchy", "log_gdp_pc", "neighbor_polyarchy"] if c in panel.columns]
     r = fit_and_evaluate(panel, b1_feats, "logistic_polyarchy_gdp")
     all_results.append(r)
     print(f"  Logistic (polyarchy+GDP): AUC={r.get('auc_roc', np.nan):.3f}, CV={r.get('cv_auc_mean', np.nan):.3f}")
 
-    # 1b. XGBoost on raw V-Dem high-level indices
     try:
         from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
         has_ensemble = True
@@ -222,13 +209,11 @@ def run_baseline_comparison():
             X_tr = scaler.fit_transform(train[vdem_feats].values)
             X_all = scaler.transform(valid[vdem_feats].values)
 
-            # XGBoost (GradientBoosting)
             xgb = GradientBoostingClassifier(n_estimators=200, max_depth=4, learning_rate=0.05,
                                               subsample=0.8, random_state=42)
             xgb.fit(X_tr, train["label"].values)
             y_xgb = xgb.predict_proba(X_all)[:, 1]
             r_xgb = evaluate(valid["label"].values, y_xgb, "xgboost_vdem_indices")
-            # CV for XGBoost
             xgb_aucs = []
             for train_end, test_end in WINDOWS:
                 w_tr = valid[valid["year"] <= train_end]
@@ -250,7 +235,6 @@ def run_baseline_comparison():
             all_results.append(r_xgb)
             print(f"  XGBoost (V-Dem indices): AUC={r_xgb['auc_roc']:.3f}, CV={r_xgb.get('cv_auc_mean', np.nan):.3f}")
 
-            # Random Forest
             rf = RandomForestClassifier(n_estimators=500, max_depth=6, random_state=42, class_weight="balanced")
             rf.fit(X_tr, train["label"].values)
             y_rf = rf.predict_proba(X_all)[:, 1]
@@ -275,7 +259,6 @@ def run_baseline_comparison():
             all_results.append(r_rf)
             print(f"  Random Forest (V-Dem indices): AUC={r_rf['auc_roc']:.3f}, CV={r_rf.get('cv_auc_mean', np.nan):.3f}")
 
-    # Full AIM4D
     if "combined_risk" in panel.columns:
         valid = panel.dropna(subset=["combined_risk", "label"])
         r_full = evaluate(valid["label"].values, valid["combined_risk"].values, "aim4d_full")
@@ -292,28 +275,21 @@ def run_baseline_comparison():
         all_results.append(r_full)
         print(f"  AIM4D Full: AUC={r_full['auc_roc']:.3f}, CV={r_full.get('cv_auc_mean', np.nan):.3f}")
 
-    # ================================================================
-    # TABLE 2: LOCO ABLATION (meta-learner constant, ablate inputs)
-    # ================================================================
     print(f"\n{'='*60}")
     print("TABLE 2: LOCO Ablation (meta-learner constant, ablate inputs)")
     print("  Standard: Hamilton et al. (2017), Kipf & Welling (2017)")
     print(f"{'='*60}\n")
 
-    # Build the full meta-learner feature set
     from stage5_ews.estimate import run_ews
     ews_df = run_ews()
 
-    # Identify meta-learner feature groups
     csd_features = [c for c in ews_df.columns if "csd" in c.lower() and c != "csd_x_network"]
     election_features = [c for c in ews_df.columns if "election" in c.lower() or "party_threat" in c.lower()]
     military_features = [c for c in ews_df.columns if "mil_" in c.lower()]
     network_features = [c for c in ews_df.columns if "network" in c.lower() or "contagion" in c.lower() or c == "csd_x_network"]
     dsp_features = [c for c in ews_df.columns if c.startswith("v2sm")]
 
-    # All meta-learner input features
     all_meta_candidates = csd_features + election_features + military_features + network_features + dsp_features
-    # Add detrended + era interaction versions
     all_meta = []
     for f in all_meta_candidates:
         if f in ews_df.columns:
@@ -324,7 +300,7 @@ def run_baseline_comparison():
             all_meta.append(f"{f}_x_post2015")
         if f"{f}_x_post2015_detrended" in ews_df.columns:
             all_meta.append(f"{f}_x_post2015_detrended")
-    all_meta = list(dict.fromkeys(all_meta))  # deduplicate preserving order
+    all_meta = list(dict.fromkeys(all_meta))
     all_meta = [f for f in all_meta if f in ews_df.columns]
 
     if not all_meta or "label" not in ews_df.columns:
@@ -333,7 +309,6 @@ def run_baseline_comparison():
         summary.to_csv(os.path.join(OUTPUT_DIR, "baseline_comparison_results.csv"), index=False)
         return summary
 
-    # Define feature groups for LOCO
     feature_groups = {
         "CSD (univariate + multivariate)": [f for f in all_meta if any(x in f for x in ["csd", "var_z", "ar1_z", "kurt_z", "dom_eig", "xcorr"])],
         "Election vulnerability": [f for f in all_meta if any(x in f for x in ["election", "party_threat"])],
@@ -342,11 +317,9 @@ def run_baseline_comparison():
         "DSP (digital)": [f for f in all_meta if f.startswith("v2sm")],
     }
 
-    # Filter to features that actually exist
     for k in feature_groups:
         feature_groups[k] = [f for f in feature_groups[k] if f in ews_df.columns]
 
-    # Full model
     from sklearn.preprocessing import StandardScaler as SS
 
     known_w = {}
@@ -376,7 +349,6 @@ def run_baseline_comparison():
 
         result = evaluate(y, y_pred, name)
 
-        # CV
         valid_df = ews_df.copy()
         valid_df["pred"] = y_pred
         cv_aucs = []
@@ -392,12 +364,10 @@ def run_baseline_comparison():
         result["n_features"] = len(feats)
         return result
 
-    # Full meta-learner
     r_full_meta = fit_meta_learner(all_meta, "full_meta_learner")
     loco_results = [r_full_meta]
     print(f"  Full meta-learner ({r_full_meta.get('n_features', 0)} features): AUC={r_full_meta.get('auc_roc', np.nan):.3f}, CV={r_full_meta.get('cv_auc_mean', np.nan):.3f}")
 
-    # LOCO: remove each group
     for group_name, group_feats in feature_groups.items():
         if not group_feats:
             continue
@@ -407,9 +377,6 @@ def run_baseline_comparison():
         loco_results.append(r)
         print(f"  Without {group_name}: AUC={r.get('auc_roc', np.nan):.3f} (delta={delta:+.3f})")
 
-    # ================================================================
-    # SUMMARY
-    # ================================================================
     print(f"\n{'='*60}")
     print("SUMMARY: External Baselines")
     print(f"{'='*60}")
@@ -426,7 +393,6 @@ def run_baseline_comparison():
     loco_cols = [c for c in loco_cols if c in loco_df.columns]
     print(loco_df[loco_cols].to_string(index=False, float_format="%.3f"))
 
-    # Save
     combined = pd.DataFrame(all_results + loco_results)
     combined.to_csv(os.path.join(OUTPUT_DIR, "baseline_comparison_results.csv"), index=False)
     print(f"\nSaved to robustness/baseline_comparison_results.csv")

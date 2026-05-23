@@ -30,20 +30,14 @@ DATA = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(DATA, "archigos_features.csv")
 RAW = os.path.join(DATA, "Archigos_4.1.txt")
 
-# Archigos v4.1 mirrors. URLs change; we try several. If none work, see
-# manual-download instructions at bottom of error message.
 ARCHIGOS_URLS = [
-    # Harvard Dataverse mirrors (multiple file IDs for the Archigos study)
     "https://dataverse.harvard.edu/api/access/datafile/:persistentId/?persistentId=doi:10.7910/DVN/PUOZWC/Archigos_4.1_Statav14.dta",
     "https://dataverse.harvard.edu/api/access/datafile/4567836",
-    # Hein Goemans personal site (URLs change every few years)
     "https://www.rochester.edu/college/faculty/hgoemans/Archigos_4.1.txt",
     "https://www.sas.rochester.edu/psc/hgoemans/data/Archigos_4.1.txt",
     "https://hgoemans.sas.rochester.edu/data/Archigos_4.1.txt",
-    # Wayback Machine archived copy (most reliable long-term)
     "https://web.archive.org/web/2024*/https://www.rochester.edu/college/faculty/hgoemans/Archigos_4.1.txt",
     "https://web.archive.org/web/2022if_/https://www.rochester.edu/college/faculty/hgoemans/Archigos_4.1.txt",
-    # PRIO archive
     "https://www.prio.org/data/3/Archigos_4.1.zip",
 ]
 
@@ -51,7 +45,6 @@ ARCHIGOS_URLS = [
 def download_archigos():
     if os.path.exists(RAW):
         return RAW
-    # Also accept a .dta or .csv at the standard path
     for alt in [RAW.replace(".txt", ".dta"), RAW.replace(".txt", ".csv")]:
         if os.path.exists(alt):
             return alt
@@ -62,7 +55,6 @@ def download_archigos():
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = resp.read()
-            # Save in original format
             ext = ".dta" if url.endswith(".dta") else (".zip" if url.endswith(".zip") else ".txt")
             target = RAW.replace(".txt", ext)
             with open(target, "wb") as f:
@@ -87,7 +79,6 @@ def _read_archigos(path):
     if path.endswith(".dta"):
         df = pd.read_stata(path)
     elif path.endswith(".zip"):
-        # extract single file from zip
         with zipfile.ZipFile(path) as z:
             names = [n for n in z.namelist() if n.endswith((".txt", ".dta", ".csv"))]
             if not names:
@@ -107,8 +98,6 @@ def build_features():
     path = download_archigos()
     df = _read_archigos(path)
 
-    # Expected columns: ccode, idacr (iso3-ish), leader, startdate, enddate,
-    # entry, exit, prevtimesinoffice, posttenurefate, mil
     needed = {"idacr": "iso3", "startdate": "startdate", "enddate": "enddate",
               "entry": "entry", "exit": "exit", "mil": "mil",
               "yrborn": "yrborn"}
@@ -121,7 +110,6 @@ def build_features():
     sub["end_year"] = sub["end_year"].fillna(2025).astype(int)
     sub["start_year"] = sub["start_year"].astype(int)
 
-    # Expand to country-year panel
     rows = []
     for _, r in sub.iterrows():
         iso3 = r["iso3"]
@@ -144,7 +132,6 @@ def build_features():
     out = out.sort_values(["iso3", "year", "leader_tenure_years"], ascending=[True, True, False])
     out = out.drop_duplicates(subset=["iso3", "year"], keep="first")
 
-    # Years since last irregular leadership change per country
     out = out.sort_values(["iso3", "year"]).reset_index(drop=True)
     out["years_since_irregular"] = 0
     for iso3, grp in out.groupby("iso3"):

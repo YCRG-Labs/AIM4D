@@ -21,7 +21,7 @@ Reports:
 import sys
 import os
 import warnings
-warnings.filterwarnings("ignore")  # Suppress HMM convergence warnings globally
+warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
 from sklearn.metrics import cohen_kappa_score
@@ -40,7 +40,7 @@ from stage3_msvar.estimate import (
 
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 S_VALUES = [3, 4, 5, 6]
-N_RESTARTS = 20  # Reduced from 60 for robustness testing (sufficient for sensitivity)
+N_RESTARTS = 20
 
 
 STATE_LABELS_BY_S = {
@@ -135,7 +135,7 @@ def fit_hmm_with_states(X_all, lengths, n_states):
                 f1_means = model.means_[:, 0]
                 ordered = np.all(np.diff(f1_means) <= 0)
                 margins = -np.diff(f1_means)
-                margin_ok = np.all(margins >= MIN_F1_MARGIN * 0.5)  # relaxed for S=6
+                margin_ok = np.all(margins >= MIN_F1_MARGIN * 0.5)
 
                 if ordered and margin_ok and score > best_score:
                     best_score = score
@@ -144,7 +144,6 @@ def fit_hmm_with_states(X_all, lengths, n_states):
                 continue
 
     if best_model is None:
-        # Fallback: unconstrained + reorder
         for restart in range(N_RESTARTS):
             model = hmm.GaussianHMM(
                 n_components=n_states, covariance_type="full",
@@ -173,16 +172,14 @@ def fit_hmm_with_states(X_all, lengths, n_states):
 
     best_model.transmat_ = regularize_transmat_s(best_model.transmat_, n_states)
 
-    # BIC: -2*LL + k*ln(N)
     N = len(X_all)
     d = X_all.shape[1]
-    n_params = (n_states * d +                    # means
-                n_states * d * (d + 1) // 2 +     # covariances
-                n_states * (n_states - 1) +        # transition matrix
-                n_states - 1)                      # start probs
+    n_params = (n_states * d +
+                n_states * d * (d + 1) // 2 +
+                n_states * (n_states - 1) +
+                n_states - 1)
     bic = -2 * best_score + n_params * np.log(N)
 
-    # ICL: BIC + 2 * entropy of posterior assignments
     posteriors = best_model.predict_proba(X_all, lengths)
     entropy = -np.sum(posteriors * np.log(posteriors + 1e-300))
     icl = bic + 2 * entropy
@@ -235,7 +232,7 @@ def blocked_cv_loglik(X_all, lengths, country_order, n_states, n_folds=5):
             except Exception:
                 continue
 
-    return total_test_ll / max(total_test_obs, 1)  # per-observation LL
+    return total_test_ll / max(total_test_obs, 1)
 
 
 def validate_s(state_df, n_states):
@@ -247,12 +244,11 @@ def validate_s(state_df, n_states):
     vdem = vdem.dropna(subset=["v2x_regime"])
     vdem["v2x_regime"] = vdem["v2x_regime"].astype(int)
 
-    # Map V-Dem 4-state to n_states
     def to_nstate(regime, poly):
         if n_states == 3:
-            if regime >= 2: return 0  # democracy
-            if regime == 1: return 1  # hybrid
-            return 2                  # authoritarian
+            if regime >= 2: return 0
+            if regime == 1: return 1
+            return 2
         elif n_states == 4:
             if regime == 3: return 0
             if regime == 2: return 1
@@ -276,7 +272,6 @@ def validate_s(state_df, n_states):
     kappa = cohen_kappa_score(merged["vdem_s"], merged["state"])
     kappa_w = cohen_kappa_score(merged["vdem_s"], merged["state"], weights="linear")
 
-    # Polyarchy by state
     poly_by_state = merged.groupby("state")["v2x_polyarchy"].agg(["mean", "std", "count"])
 
     return kappa, kappa_w, poly_by_state
@@ -354,19 +349,16 @@ def run_hmm_states():
 
         print(f"  LL={ll:.1f}, BIC={bic:.1f}, ICL={icl:.1f}")
 
-        # State means (Factor 1)
         print(f"\n  State means (Factor 1, descending):")
         labels = STATE_LABELS_BY_S.get(S, {})
         for s in range(S):
             label = labels.get(s, f"state_{s}")
             print(f"    {label}: F1={model.means_[s, 0]:.3f}")
 
-        # Blocked CV
         print(f"\n  Running blocked cross-validation (5 folds)...")
         cv_ll = blocked_cv_loglik(X_all, lengths, country_order, S)
         print(f"  CV log-likelihood per obs: {cv_ll:.4f}")
 
-        # Decode and validate
         state_df = decode_states(model, X_all, lengths, country_order, df, S)
         kappa, kappa_w, poly_by_state = validate_s(state_df, S)
 
@@ -381,12 +373,10 @@ def run_hmm_states():
                 label = labels.get(s, f"state_{s}")
                 print(f"    {label}: {r['mean']:.3f} +/- {r['std']:.3f} (n={int(r['count'])})")
 
-        # State distribution
         print(f"\n  State distribution:")
         for label, count in state_df["state_label"].value_counts().items():
             print(f"    {label}: {count} ({count / len(state_df) * 100:.1f}%)")
 
-        # Persistence (diagonal of transition matrix)
         diag = np.diag(model.transmat_)
         print(f"\n  State persistence (transition matrix diagonal):")
         for s in range(S):
@@ -399,14 +389,12 @@ def run_hmm_states():
             "min_persistence": diag.min(),
         })
 
-    # Summary table
     print(f"\n{'='*50}")
     print("SUMMARY TABLE")
     print(f"{'='*50}")
     summary = pd.DataFrame(results)
     print(summary.to_string(index=False, float_format="%.3f"))
 
-    # Which S is selected by each criterion?
     valid = summary.dropna(subset=["BIC"])
     if len(valid) > 0:
         best_bic = valid.loc[valid["BIC"].idxmin(), "S"]

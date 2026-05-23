@@ -35,8 +35,6 @@ def load_all_data():
     df = df.merge(states[["country_name", "year"] + STATE_COLS], on=["country_name", "year"])
     macro_cols = ["gdp_pc", "urbanization"]
     macro_sub = macro[["iso3", "year"] + macro_cols].copy()
-    # Use train-period median (year <= TRAIN_CUTOFF) — full-panel median
-    # would inject post-cutoff information into pre-cutoff imputed rows.
     for c in macro_cols:
         train_med = macro_sub.loc[macro_sub["year"] <= TRAIN_CUTOFF, c].median()
         if pd.isna(train_med):
@@ -78,9 +76,6 @@ def build_spatial_edges(mapping, countries_iso3):
                 pairs.add((countries_iso3.index(s2), countries_iso3.index(s1)))
         alliance_by_year[yr] = pairs
 
-    # Architectural addition: cultural / linguistic similarity edges. Loaded
-    # from data/cultural_pairs.csv (Inglehart-Welzel + Huntington + language
-    # family blocs). Edge type for shared cultural-linguistic context.
     cultural_pairs = set()
     cult_path = os.path.join(base_atop, "..", "data", "cultural_pairs.csv")
     if os.path.exists(cult_path):
@@ -273,9 +268,6 @@ class INETARNet(nn.Module):
         self.n_edge_types = n_edge_types
         self.spatial_lag_dim = treatment_dim * n_edge_types
 
-        # Learned convex W combination (Neumayer & Plumper 2016, LeSage & Pace 2014).
-        # Raw logits → softmax gives one weight per edge type.
-        # Default 4 edge types: contiguity, alliance, trade, cultural.
         self.w_logits = nn.Parameter(torch.zeros(n_edge_types))
 
         self.ego_encoder = nn.Sequential(
@@ -325,7 +317,6 @@ class INETARNet(nn.Module):
         for k in range(n_e):
             block = x[:, base_dim + k * self.treatment_dim:base_dim + (k + 1) * self.treatment_dim]
             weighted_lag = weighted_lag + alpha[k] * block
-        # Replicate to preserve input dim
         return torch.cat([x_base] + [weighted_lag] * n_e, dim=-1)
 
     def encode(self, x, edge_index):
@@ -486,7 +477,6 @@ def run_stage4(seed=42, write_outputs=True):
     print(f"\nTraining INE-TARNet on spatio-temporal graph...")
     model = train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=seed)
 
-    # Report learned W weights (one per edge type)
     w_weights = model.get_w_weights().detach().numpy()
     w_names = ["contiguity", "alliance", "trade", "cultural"][:len(w_weights)]
     print(f"\n  Learned convex W weights (Neumayer & Plumper 2016):")
@@ -561,10 +551,6 @@ def run_stage4(seed=42, write_outputs=True):
     scores_df = pd.DataFrame(rows)
     scores_df = scores_df.sort_values(["country_text_id", "year"])
     scores_df["contagion_smooth"] = scores_df.groupby("country_text_id")["contagion_score"].transform(
-        # Trailing (non-centred) 3-yr smoothing: only uses years t-2..t.
-        # Centred rolling was using year t+1 to smooth year t's contagion,
-        # which would leak future contagion into the smoothed feature if it
-        # were ever used as a model input.
         lambda s: s.rolling(3, min_periods=1).mean()
     )
 

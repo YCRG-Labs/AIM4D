@@ -33,7 +33,7 @@ import torch.nn.functional as F
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
-from stage4_nscm.estimate import (  # noqa: E402
+from stage4_nscm.estimate import (
     load_all_data, build_spatial_edges, build_spatiotemporal_graph,
     train_model, INETARNet, STATE_COLS, TREATMENT_DIM,
     FACTOR_COLS, BETA_COLS,
@@ -41,13 +41,10 @@ from stage4_nscm.estimate import (  # noqa: E402
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gnn_counterfactual.csv")
 
-# Pairs chosen to tell substantive stories: democratic backsliders given
-# the neighbor profile of (a) a peer that's further along the trajectory,
-# (b) an autocratic peer, and (c) a stable democracy.
 PAIRS = [
-    ("Hungary",                  "Türkiye"),   # backslider given further-along peer
-    ("Hungary",                  "Denmark"),   # backslider given stable democracy
-    ("Hungary",                  "Russia"),    # backslider given autocratic peer
+    ("Hungary",                  "Türkiye"),
+    ("Hungary",                  "Denmark"),
+    ("Hungary",                  "Russia"),
     ("Türkiye",                  "Denmark"),
     ("Türkiye",                  "Hungary"),
     ("Poland",                   "Hungary"),
@@ -63,10 +60,8 @@ CF_YEARS = [2017, 2019, 2021, 2023, 2025]
 def main():
     print("Loading Stage 4 data...")
     df, mapping = load_all_data()
-    # Match Stage 4's feature_cols (see stage4_nscm/estimate.py:460)
     feature_cols = FACTOR_COLS + BETA_COLS + ["gdp_pc", "urbanization"]
 
-    # Match Stage 4's year filter: 1990 onward, only years with data for all features
     years_all = sorted(df["year"].unique())
     years_use = [y for y in years_all if y >= 1990]
     complete = df.groupby("country_text_id").apply(
@@ -86,7 +81,6 @@ def main():
     print(f"\nTraining INE-TARNet for counterfactual analysis...")
     model = train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42)
 
-    # Map country_name (paper-facing) -> iso3, then iso3 -> country index
     name_to_iso = df.drop_duplicates("country_text_id").set_index("country_name")["country_text_id"].to_dict()
     iso_to_idx = {iso: i for i, iso in enumerate(countries_iso3)}
     year_to_idx = {yr: t for t, yr in enumerate(years_use)}
@@ -102,19 +96,14 @@ def main():
     rows = []
     model.eval()
     with torch.no_grad():
-        # Baseline: predict on actual x, full graph (used for "actual")
         h_full, _ = model.encode(x, edge_index)
         y_full_actual = F.softmax(model.outcome_logits(h_full), dim=-1).numpy()
 
-        # No-contagion counterfactual (zero out spatial lag for all nodes)
         x_zero = x.clone()
         x_zero[:, -spatial_lag_dim:] = 0.0
         h_zero, _ = model.encode(x_zero, torch.zeros(2, 0, dtype=torch.long))
         y_no_contagion = F.softmax(model.outcome_logits(h_zero), dim=-1).numpy()
 
-        # Swap counterfactual: per (target, reference) pair, replace target's
-        # spatial lag with reference's spatial lag at the same year, keep
-        # everything else fixed.
         for target_name, ref_name in PAIRS:
             for year in CF_YEARS:
                 tgt_id = node_id(target_name, year)
@@ -149,7 +138,6 @@ def main():
     print("\n" + "=" * 78)
     print("GNN COUNTERFACTUAL: NEIGHBOR-SWAP DECOMPOSITION")
     print("=" * 78)
-    # Print a summary collapsed across years and outcome states: mean |swap-actual|
     summary = (df_out.groupby(["target", "reference"])
                .agg(mean_abs_delta_swap=("delta_swap", lambda s: float(np.mean(np.abs(s)))),
                     mean_abs_delta_no_contagion=("delta_no_contagion", lambda s: float(np.mean(np.abs(s)))),
@@ -158,8 +146,6 @@ def main():
                .sort_values("mean_abs_delta_swap", ascending=False))
     print(summary.to_string(index=False))
 
-    # Show liberal_democracy probability delta specifically (the canonical
-    # "is this country a democracy" outcome)
     libdem_rows = df_out[df_out["outcome_state"] == "liberal_democracy"]
     print(f"\nLiberal-democracy P(.) under neighbor swap (year 2025):")
     swap_2025 = libdem_rows[libdem_rows["year"] == 2025]

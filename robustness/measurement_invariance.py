@@ -66,15 +66,12 @@ def load_fh():
     fh = pd.read_csv(FH_CSV)
     subq = [c for c in fh.columns if c not in ("country", "year")]
     fh = fh.dropna(subset=subq, how="all")
-    # map country -> iso3
     try:
         import country_converter as coco
         cc = coco.CountryConverter()
         mapped = cc.convert(names=fh["country"].tolist(), to="ISO3", not_found=None)
     except ImportError:
         sys.exit("Need country_converter: pip install country_converter")
-    # coco returns a LIST for ambiguous multi-match names and None for
-    # unmatched — both are unusable as merge keys. Keep only clean strings.
     fh["country_text_id"] = [m if isinstance(m, str) else None for m in mapped]
     fh = fh.dropna(subset=["country_text_id"])
     return fh, subq
@@ -86,11 +83,9 @@ def load_polity():
     pol = pd.read_csv(POL_CSV)
     comps = [c for c in ["xrcomp", "xropen", "xconst", "parreg", "parcomp"]
              if c in pol.columns]
-    # map ccode (COW) -> country_text_id
     cow = pd.read_csv(COW_MAP).set_index("COWcode")["country_text_id"]
     pol["country_text_id"] = pol["ccode"].map(cow)
     pol = pol.dropna(subset=["country_text_id"])
-    # Polity uses -66/-77/-88 as special codes; treat as missing
     for c in comps:
         pol[c] = pol[c].where(pol[c] >= -10, np.nan)
     return pol, comps
@@ -106,10 +101,6 @@ def main():
     print(f"FH: {len(fh)} rows, {len(fh_cols)} subquestions")
     print(f"Polity5: {len(pol)} rows, {len(pol_cols)} components")
 
-    # Bulletproof the merge keys: coerce country_text_id to clean strings and
-    # year to int in BOTH frames, dropping anything non-scalar. country_converter
-    # can emit a list for ambiguous multi-match names, which poisons the merge
-    # with 'unhashable type: list' no matter which frame it lands in.
     for d in (fh, pol):
         d["country_text_id"] = [c if isinstance(c, str) else None
                                 for c in d["country_text_id"]]
@@ -119,7 +110,6 @@ def main():
     fh["year"] = fh["year"].astype(int)
     pol["year"] = pol["year"].astype(int)
 
-    # Merge FH + Polity on (country_text_id, year), restrict to overlap window
     merged = fh.merge(pol, on=["country_text_id", "year"], how="inner",
                       suffixes=("_fh", "_pol"))
     merged = merged[(merged["year"] >= OVERLAP_START) & (merged["year"] <= OVERLAP_END)]
@@ -131,7 +121,6 @@ def main():
     if len(merged) < 100:
         sys.exit("Too few overlapping country-years for a stable factor model.")
 
-    # Standardize + PCA
     X = StandardScaler().fit_transform(merged[indicators].values)
     k_pa, real_eigs, thresh = _parallel_analysis(X)
     print(f"Parallel analysis suggests K={k_pa} "
@@ -140,8 +129,6 @@ def main():
     pca = PCA(n_components=max(k_pa, 1))
     scores = pca.fit_transform(X)
     fh_polity_f1 = scores[:, 0]
-    # sign-align so higher = more democratic (use a free-expression-like FH item,
-    # FH scores: higher = more free; D1 = media freedom)
     ref = merged["D1"].values if "D1" in merged.columns else merged[indicators[0]].values
     if np.corrcoef(fh_polity_f1, ref)[0, 1] < 0:
         fh_polity_f1 = -fh_polity_f1
@@ -149,7 +136,6 @@ def main():
     merged = merged.copy()
     merged["fh_polity_f1"] = fh_polity_f1
 
-    # Load V-Dem factor-1 and merge
     vdem = pd.read_csv(VDEM_FACTORS)[["country_text_id", "year", "factor_1"]]
     cmp = merged[["country_text_id", "year", "fh_polity_f1"]].merge(
         vdem, on=["country_text_id", "year"], how="inner")
@@ -158,7 +144,6 @@ def main():
     if len(cmp) < 50:
         sys.exit("Too few rows to compare to V-Dem factor-1.")
 
-    # Sign-align to V-Dem factor-1
     if np.corrcoef(cmp["fh_polity_f1"], cmp["factor_1"])[0, 1] < 0:
         cmp["fh_polity_f1"] = -cmp["fh_polity_f1"]
 

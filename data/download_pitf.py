@@ -28,13 +28,9 @@ INDICATORS = {
 
 def fetch_one(code, name, years):
     df = wb.data.DataFrame(code, time=years, labels=False)
-    # wbgapi version variance: index name may be 'economy', 'Country', or missing.
-    # Year columns may be 'YR2020' (string) or 2020 (int).
     df = df.reset_index()
-    # First column = country identifier; rename to iso3
     first = df.columns[0]
     df = df.rename(columns={first: "iso3"})
-    # Identify year columns (anything that isn't the iso3 col)
     year_cols = [c for c in df.columns if c != "iso3"]
     df = df.melt(id_vars=["iso3"], value_vars=year_cols, var_name="yr", value_name=name)
 
@@ -66,12 +62,10 @@ def main():
     for p in parts[1:]:
         df = df.merge(p, on=["iso3", "year"], how="outer")
 
-    # Youth bulge proxy: 0.4 * working-age share (as a stand-in for 15-29 share)
     if "work_age_share" in df.columns:
         df["youth_bulge_proxy"] = df["work_age_share"] * 0.4
 
     df = df.sort_values(["iso3", "year"]).reset_index(drop=True)
-    # Within-country forward-fill for the latest years where WDI is sparse
     for col in df.columns:
         if col in {"iso3", "year"}:
             continue

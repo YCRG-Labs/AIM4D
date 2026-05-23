@@ -44,7 +44,6 @@ def parse_metrics(log):
     m = re.search(r"AUC-PR \(OOS\):\s+([\d.]+)", log)
     if m:
         out["oos_auc_pr"] = float(m.group(1))
-    # Anchor in-sample AUC to the "Base rate" line in the Continuous-risk block
     m = re.search(r"Base rate.*?AUC-ROC:\s+([\d.]+)", log, re.DOTALL)
     if m:
         out["in_sample_auc"] = float(m.group(1))
@@ -70,13 +69,11 @@ def parse_metrics(log):
 def main():
     rows = []
 
-    # Config 1: baseline (all features)
     log = run_stage5({}, "baseline_all_features")
     m = parse_metrics(log)
     m["config"] = "all_features"
     rows.append(m)
 
-    # Config 2: elastic-net pruned
     log = run_stage5({"AIM4D_USE_ENET": "1"}, "elastic_net_pruned")
     m = parse_metrics(log)
     m["config"] = "elastic_net_pruned"

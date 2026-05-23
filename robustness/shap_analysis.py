@@ -26,25 +26,20 @@ def run_shap_analysis():
     print("SHAP Interpretability Analysis")
     print("=" * 70)
 
-    # Run full stage 5 to get models and data
     from stage5_ews.estimate import run_ews
     ews_df = run_ews()
 
-    # We need to access the fitted models — re-extract from the module
-    # Since models aren't returned, we re-fit on the same data
     from stage5_ews.estimate import KNOWN_EPISODES, LEAD_YEARS, TRAIN_CUTOFF
     from sklearn.linear_model import LogisticRegressionCV, LogisticRegression, SGDClassifier
     from sklearn.ensemble import GradientBoostingClassifier
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import StratifiedKFold
 
-    # Rebuild features (same as in run_ews)
     base_features = [c for c in ews_df.columns if any(c.startswith(p) for p in
                      ["csd_index", "mv_csd", "election_", "party_threat", "mil_zscore",
                       "network_", "csd_x_", "v2sm", "protest_", "conflict_", "repression_",
                       "v2jun", "v2xlg", "v2x_ju", "v2exres"])]
 
-    # Filter to numeric, non-label columns
     exclude = ["label", "label_soft", "year", "combined_risk", "calibrated_risk",
                "alert_tier", "combined_alert", "combined_alert_legacy",
                "raw_alert", "ews_alert", "election_alert", "dem_vulnerability_alert",
@@ -57,7 +52,6 @@ def run_shap_analysis():
                        or "_detrended" in c or "_x_post" in c or "_zscore" in c
                        or c in base_features]
 
-    # Use the same feature set as the meta-learner by checking what's available
     all_meta = [c for c in meta_candidates if c in ews_df.columns and not ews_df[c].isna().all()]
 
     if len(all_meta) < 5:
@@ -66,7 +60,6 @@ def run_shap_analysis():
 
     print(f"  Features for SHAP: {len(all_meta)}")
 
-    # Build labels
     label_decay = 2.0
     known_w_soft = {}
     for c, info in KNOWN_EPISODES.items():
@@ -85,7 +78,6 @@ def run_shap_analysis():
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
-    # Elastic net feature selection
     half_life = 8
     max_year = ews_df.loc[train_mask, "year"].max()
     time_weights = np.exp(-np.log(2) * (max_year - ews_df["year"].values) / half_life)
@@ -98,7 +90,6 @@ def run_shap_analysis():
     X_selected = X_scaled[:, selected_mask]
     print(f"  Selected features: {len(selected_features)}")
 
-    # Fit LR + GB
     lr = LogisticRegressionCV(cv=3, scoring="average_precision", max_iter=1000, random_state=42)
     lr.fit(X_selected[train_mask], y[train_mask], sample_weight=time_weights[train_mask])
 
@@ -106,10 +97,8 @@ def run_shap_analysis():
                                      subsample=0.8, min_samples_leaf=20, random_state=42)
     gb.fit(X_selected[train_mask], y[train_mask], sample_weight=time_weights[train_mask])
 
-    # Stacking weights (simplified — use 0.2/0.8 as found in main run)
     w_lr, w_gb = 0.2, 0.8
 
-    # Define feature groups
     feature_groups = {
         "CSD (univariate)": [f for f in selected_features if "csd_index" in f and "mv_" not in f and "x_" not in f],
         "CSD (multivariate)": [f for f in selected_features if "mv_csd" in f],
@@ -122,36 +111,29 @@ def run_shap_analysis():
         "Interactions": [f for f in selected_features if "csd_x_election" in f or "csd_x_military" in f],
     }
 
-    # Remove empty groups
     feature_groups = {k: v for k, v in feature_groups.items() if v}
 
     print(f"\n  Feature groups:")
     for grp, members in feature_groups.items():
         print(f"    {grp}: {len(members)} features")
 
-    # Option B: weighted SHAP (faster, exact for linear blend)
-    # TreeSHAP for GB, LinearExplainer for LR
     try:
         import shap
 
         print(f"\n  Computing SHAP values (TreeSHAP for GB, Linear for LR)...")
 
-        # GB SHAP (exact via TreeSHAP)
         gb_explainer = shap.TreeExplainer(gb)
         gb_shap = gb_explainer.shap_values(X_selected)
         if isinstance(gb_shap, list):
-            gb_shap = gb_shap[1]  # class 1 SHAP values
+            gb_shap = gb_shap[1]
 
-        # LR SHAP (exact via LinearExplainer)
         lr_explainer = shap.LinearExplainer(lr, X_selected[train_mask])
         lr_shap = lr_explainer.shap_values(X_selected)
 
-        # Weighted combination
         ensemble_shap = w_lr * lr_shap + w_gb * gb_shap
 
         print(f"  SHAP values computed: {ensemble_shap.shape}")
 
-        # Grouped importance
         name_to_idx = {name: i for i, name in enumerate(selected_features)}
         print(f"\n  Grouped SHAP importance (mean |SHAP| summed within group):")
         group_results = []
@@ -162,14 +144,12 @@ def run_shap_analysis():
                 group_results.append({"group": grp, "importance": importance, "n_features": len(col_idx)})
                 print(f"    {grp}: {importance:.4f} ({len(col_idx)} features)")
 
-        # Top individual features
         feat_importance = np.abs(ensemble_shap).mean(axis=0)
         top_idx = np.argsort(feat_importance)[::-1][:15]
         print(f"\n  Top 15 individual features by mean |SHAP|:")
         for i in top_idx:
             print(f"    {selected_features[i]}: {feat_importance[i]:.4f}")
 
-        # Save results
         group_df = pd.DataFrame(group_results).sort_values("importance", ascending=False)
         group_df.to_csv(os.path.join(OUTPUT_DIR, "shap_grouped_importance.csv"), index=False)
 

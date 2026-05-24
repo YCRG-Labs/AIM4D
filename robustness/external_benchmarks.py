@@ -24,6 +24,11 @@ import time
 import warnings
 
 warnings.filterwarnings("ignore")
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "BLIS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_v, "4")
+
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, SGDClassifier
@@ -191,7 +196,7 @@ class UnweightedEnsemble:
         self.members = [
             make_enet(),
             RandomForestClassifier(n_estimators=300, max_depth=6, class_weight="balanced",
-                                   random_state=42, n_jobs=-1),
+                                   random_state=42, n_jobs=4),
             HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.05,
                                            random_state=42),
         ]

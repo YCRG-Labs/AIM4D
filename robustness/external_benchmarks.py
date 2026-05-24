@@ -20,13 +20,14 @@ results sit directly alongside the in-house baselines and AIM4D.
 
 import sys
 import os
+import time
 import warnings
 
 warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score
 
@@ -41,10 +42,27 @@ BASE = os.path.join(os.path.dirname(__file__), "..")
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 REGIME_DUMMIES = ["reg_AP", "reg_Dfact", "reg_DP", "reg_DF", "reg_transition"]
 
+_VDEM_CACHE = None
+
+
+def _load_vdem():
+    global _VDEM_CACHE
+    if _VDEM_CACHE is None:
+        _VDEM_CACHE = pd.read_csv(os.path.join(BASE, "data", "vdem_v16.csv"), low_memory=False)
+    return _VDEM_CACHE
+
+
+def make_enet():
+    """Single fixed-config elastic-net logit. No internal CV grid: a defensible
+    penalised baseline that fits in seconds rather than minutes per window."""
+    return LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5,
+                              C=0.5, max_iter=800, tol=1e-3, class_weight="balanced",
+                              random_state=42, n_jobs=-1)
+
 
 def load_panel():
     """Country-year panel with the PITF inputs and persistence score merged on."""
-    vdem = pd.read_csv(os.path.join(BASE, "data", "vdem_v16.csv"), low_memory=False)
+    vdem = _load_vdem()
     vdem = vdem[(vdem["year"] >= 1970) & (vdem["year"] <= 2025)].copy()
 
     macro = pd.read_csv(os.path.join(BASE, "data", "macro_covariates.csv"))
@@ -94,7 +112,7 @@ def load_panel():
 
 def load_indicator_panel():
     """The 332-indicator V-Dem matrix used by Stage 1, with onset labels merged on."""
-    vdem = pd.read_csv(os.path.join(BASE, "data", "vdem_v16.csv"), low_memory=False)
+    vdem = _load_vdem().copy()
     indicators = select_indicators(vdem)
     panel = build_panel(vdem, indicators)
     panel = build_labels(panel)
@@ -158,12 +176,11 @@ class UnweightedEnsemble:
 
     def __init__(self):
         self.members = [
-            LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5,
-                               C=1.0, max_iter=2000, class_weight="balanced", random_state=42),
-            RandomForestClassifier(n_estimators=500, max_depth=6, class_weight="balanced",
+            make_enet(),
+            RandomForestClassifier(n_estimators=300, max_depth=6, class_weight="balanced",
                                    random_state=42, n_jobs=-1),
-            GradientBoostingClassifier(n_estimators=200, max_depth=3, learning_rate=0.05,
-                                       subsample=0.8, random_state=42),
+            HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.05,
+                                           random_state=42),
         ]
 
     def fit(self, X, y):
@@ -176,55 +193,55 @@ class UnweightedEnsemble:
         return np.column_stack([1 - p, p])
 
 
-def make_enet():
-    return LogisticRegressionCV(penalty="elasticnet", solver="saga", l1_ratios=[0.5],
-                                Cs=5, cv=3, scoring="roc_auc", max_iter=2000,
-                                class_weight="balanced", random_state=42, n_jobs=-1)
-
-
 def run():
-    print("=" * 70)
-    print("EXTERNAL FORECASTING BENCHMARKS (re-estimated on AIM4D panel)")
-    print("=" * 70)
+    t0 = time.time()
+
+    def lap():
+        return f"{time.time() - t0:5.0f}s"
+
+    print("=" * 70, flush=True)
+    print("EXTERNAL FORECASTING BENCHMARKS (re-estimated on AIM4D panel)", flush=True)
+    print("=" * 70, flush=True)
 
     panel = load_panel()
-    print(f"\nPanel: {len(panel)} country-years, {int(panel['label'].sum())} positive labels")
+    print(f"[{lap()}] panel: {len(panel)} country-years, "
+          f"{int(panel['label'].sum())} positive labels", flush=True)
 
     results = []
 
     r = score_row(panel, "poly_decline_3yr", "persistence_trend")
     results.append(r)
-    print(f"  Persistence (3yr polyarchy decline): AUC={r['auc_roc']:.3f}, "
-          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}")
+    print(f"[{lap()}] persistence (3yr polyarchy decline): AUC={r['auc_roc']:.3f}, "
+          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}", flush=True)
 
     pitf_feats = REGIME_DUMMIES + ["imr_normed_ln", "n_backsliding_neighbors", "state_discrimination"]
     r = fit_model_row(panel, pitf_feats, lambda: LogisticRegression(
         C=1.0, max_iter=2000, class_weight="balanced", random_state=42), "pitf_goldstone_2010")
     results.append(r)
-    print(f"  PITF logit (Goldstone 2010): AUC={r['auc_roc']:.3f}, "
-          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}")
+    print(f"[{lap()}] PITF logit (Goldstone 2010): AUC={r['auc_roc']:.3f}, "
+          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}", flush=True)
 
     ind_panel, indicators = load_indicator_panel()
-    print(f"  (indicator matrix: {len(ind_panel)} rows, {len(indicators)} indicators)")
+    print(f"[{lap()}] indicator matrix: {len(ind_panel)} rows, {len(indicators)} indicators", flush=True)
 
     r = fit_model_row(ind_panel, indicators, make_enet, "elastic_net_full_vdem")
     results.append(r)
-    print(f"  Elastic-net (full V-Dem): AUC={r['auc_roc']:.3f}, "
-          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}")
+    print(f"[{lap()}] elastic-net (full V-Dem): AUC={r['auc_roc']:.3f}, "
+          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}", flush=True)
 
     r = fit_model_row(ind_panel, indicators, UnweightedEnsemble, "vforecast_ensemble")
     results.append(r)
-    print(f"  V-Forecast ensemble (Morgan 2019): AUC={r['auc_roc']:.3f}, "
-          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}")
+    print(f"[{lap()}] V-Forecast ensemble (Morgan 2019): AUC={r['auc_roc']:.3f}, "
+          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}", flush=True)
 
     df = pd.DataFrame(results)
     cols = ["model", "auc_roc", "auc_pr", "brier", "cv_auc_mean", "cv_auc_std", "n", "n_positive"]
     cols = [c for c in cols if c in df.columns]
-    print("\n" + "=" * 70)
-    print(df[cols].to_string(index=False, float_format="%.3f"))
+    print("\n" + "=" * 70, flush=True)
+    print(df[cols].to_string(index=False, float_format="%.3f"), flush=True)
     out = os.path.join(OUTPUT_DIR, "external_benchmarks_results.csv")
     df.to_csv(out, index=False)
-    print(f"\nSaved to {out}")
+    print(f"\n[{lap()}] saved to {out}", flush=True)
     return df
 
 

@@ -2,5 +2,6 @@ data/vdem_v16.csv
 data/contiguity/
 data/atop/
 data/p5v2018.xls
+data/*.pkl
 *.zip
 __pycache__/

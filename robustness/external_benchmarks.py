@@ -26,7 +26,7 @@ import warnings
 warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score
@@ -43,21 +43,29 @@ OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 REGIME_DUMMIES = ["reg_AP", "reg_Dfact", "reg_DP", "reg_DF", "reg_transition"]
 
 _VDEM_CACHE = None
+VDEM_PKL = os.path.join(BASE, "data", "vdem_v16.pkl")
+IND_PKL = os.path.join(BASE, "data", "_ind_panel.pkl")
 
 
 def _load_vdem():
+    """Read the 3,872-column V-Dem file once, cached to a pickle so reruns skip
+    the multi-minute CSV parse."""
     global _VDEM_CACHE
     if _VDEM_CACHE is None:
-        _VDEM_CACHE = pd.read_csv(os.path.join(BASE, "data", "vdem_v16.csv"), low_memory=False)
+        if os.path.exists(VDEM_PKL):
+            _VDEM_CACHE = pd.read_pickle(VDEM_PKL)
+        else:
+            _VDEM_CACHE = pd.read_csv(os.path.join(BASE, "data", "vdem_v16.csv"), low_memory=False)
+            _VDEM_CACHE.to_pickle(VDEM_PKL)
     return _VDEM_CACHE
 
 
 def make_enet():
-    """Single fixed-config elastic-net logit. No internal CV grid: a defensible
-    penalised baseline that fits in seconds rather than minutes per window."""
-    return LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5,
-                              C=0.5, max_iter=800, tol=1e-3, class_weight="balanced",
-                              random_state=42, n_jobs=-1)
+    """Elastic-net logit via stochastic gradient: a defensible penalised baseline
+    that fits in well under a second, where the saga solver took ~2 minutes."""
+    return SGDClassifier(loss="log_loss", penalty="elasticnet", l1_ratio=0.5,
+                         alpha=1e-4, max_iter=1000, tol=1e-3, class_weight="balanced",
+                         random_state=42)
 
 
 def load_panel():
@@ -111,11 +119,16 @@ def load_panel():
 
 
 def load_indicator_panel():
-    """The 332-indicator V-Dem matrix used by Stage 1, with onset labels merged on."""
+    """The 332-indicator V-Dem matrix used by Stage 1, with onset labels merged on.
+    Cached to a pickle so the interpolation in build_panel runs only once."""
+    if os.path.exists(IND_PKL):
+        cached = pd.read_pickle(IND_PKL)
+        return cached["panel"], cached["indicators"]
     vdem = _load_vdem().copy()
     indicators = select_indicators(vdem)
     panel = build_panel(vdem, indicators)
     panel = build_labels(panel)
+    pd.to_pickle({"panel": panel, "indicators": indicators}, IND_PKL)
     return panel, indicators
 
 
@@ -232,6 +245,13 @@ def run():
     r = fit_model_row(ind_panel, indicators, UnweightedEnsemble, "vforecast_ensemble")
     results.append(r)
     print(f"[{lap()}] V-Forecast ensemble (Morgan 2019): AUC={r['auc_roc']:.3f}, "
+          f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}", flush=True)
+
+    ews = pd.read_csv(os.path.join(BASE, "stage5_ews", "ews_signals.csv"))
+    ews = build_labels(ews)
+    r = score_row(ews, "combined_risk", "aim4d_full")
+    results.append(r)
+    print(f"[{lap()}] AIM4D (combined_risk, same folds): AUC={r['auc_roc']:.3f}, "
           f"CV={r.get('cv_auc_mean', np.nan):.3f}, n={r.get('n')}", flush=True)
 
     df = pd.DataFrame(results)

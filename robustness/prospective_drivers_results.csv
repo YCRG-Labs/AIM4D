@@ -1,0 +1,26 @@
+country,year,risk,primary_driver,top_share,second
+Bolivia,2025,0.476,mixed (structural / macro / latent factor dynamics),0.22,latent factor dynamics
+Argentina,2025,0.463,latent factor dynamics,0.38,critical slowing down
+Niger,2025,0.456,mixed (structural / macro / latent factor dynamics),0.27,latent factor dynamics
+Iran,2025,0.409,mixed (digital information control / latent factor dynamics),0.24,latent factor dynamics
+Uganda,2025,0.409,mixed (latent factor dynamics / digital information control),0.3,digital information control
+Malaysia,2025,0.382,mixed (critical slowing down / election vulnerability),0.25,election vulnerability
+Chad,2025,0.377,mixed (latent factor dynamics / structural / macro),0.26,structural / macro
+South Korea,2025,0.375,mixed (mobilization / latent factor dynamics),0.31,latent factor dynamics
+Botswana,2025,0.364,mixed (structural / macro / latent factor dynamics),0.24,latent factor dynamics
+Mexico,2025,0.363,mixed (latent factor dynamics / critical slowing down),0.24,critical slowing down
+Türkiye,2025,0.361,mixed (structural / macro / critical slowing down),0.26,critical slowing down
+Burma/Myanmar,2025,0.297,mixed (structural / macro / critical slowing down),0.29,critical slowing down
+Colombia,2025,0.292,mixed (latent factor dynamics / structural / macro),0.26,structural / macro
+Tanzania,2025,0.279,latent factor dynamics,0.3,digital information control
+Guinea-Bissau,2025,0.278,latent factor dynamics,0.36,structural / macro
+Brazil,2025,0.273,structural / macro,0.32,critical slowing down
+Democratic Republic of the Congo,2025,0.25,structural / macro,0.36,latent factor dynamics
+Philippines,2025,0.249,mixed (structural / macro / mobilization),0.24,mobilization
+Tunisia,2025,0.247,mixed (structural / macro / latent factor dynamics),0.24,latent factor dynamics
+Central African Republic,2025,0.241,mixed (structural / macro / latent factor dynamics),0.24,latent factor dynamics
+Mongolia,2025,0.236,mixed (latent factor dynamics / structural / macro),0.34,structural / macro
+Somalia,2025,0.231,mixed (structural / macro / latent factor dynamics),0.31,latent factor dynamics
+Burkina Faso,2025,0.229,mixed (structural / macro / latent factor dynamics),0.27,latent factor dynamics
+Guinea,2025,0.219,structural / macro,0.39,latent factor dynamics
+Senegal,2025,0.218,mixed (latent factor dynamics / critical slowing down),0.3,critical slowing down

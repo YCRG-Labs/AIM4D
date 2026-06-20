@@ -5,3 +5,4 @@ data/p5v2018.xls
 data/*.pkl
 *.zip
 __pycache__/
+.backup_*/

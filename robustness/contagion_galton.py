@@ -66,7 +66,7 @@ def build_W_contiguity(countries):
     cm = pd.read_csv(COWMAP)
     cow2iso = dict(zip(cm["COWcode"], cm["country_text_id"]))
     cd = pd.read_csv(CONTIG)
-    cd = cd[cd["conttype"] == 1]  # direct land border
+    cd = cd[cd["conttype"] == 1]
     idx = {c: i for i, c in enumerate(countries)}
     W = np.zeros((len(countries), len(countries)))
     n = 0

@@ -10,6 +10,40 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 FACTOR_COLS = ["factor_1", "factor_2", "factor_3", "factor_4"]
 MIN_OBS = 30
 MAX_TRAIN_YEAR = int(os.environ.get("AIM4D_CUTOFF", "2019"))
+WINSOR_Q = float(os.environ.get("AIM4D_BETA_WINSOR", "0.01"))
+
+
+def winsorize_betas(beta_df, beta_cols, q=WINSOR_Q):
+    """Cap the upper-tail variance-collapse artifacts before they propagate.
+
+    The state-space estimator produces spuriously large POSITIVE loadings
+    during synchronized democratization waves, when the collapse in
+    cross-country variance inflates every country's loading: the 1989-1992
+    Eastern-Bloc transitions dominate the right tail (Albania +20, Bulgaria
+    +17, Romania +15, Hungary +14), an order of magnitude beyond the bulk of
+    the distribution. Left raw, this cluster inflates the column mean/std used
+    to standardize every other country's node feature in Stage 4 and pushes
+    the beta panel of Figure 5 off-scale.
+
+    We winsorize the UPPER tail of each beta column at its (1-q) training
+    percentile. The artifact is directional: the lower tail is retained
+    because large negative loadings occur in normal-variance periods and
+    reflect genuine counter-movement against the global trend (Hungary's
+    -8 to -11 onset signature around 2009-2011, the clearest such signal in
+    the panel), which is substantive rather than artefactual. Bounds are fit
+    on the pre-cutoff training rows only (year <= MAX_TRAIN_YEAR) and applied
+    to all rows, matching the leakage discipline used elsewhere in the
+    pipeline (Tukey 1977; Leys et al. 2013).
+    """
+    train = beta_df["year"] <= MAX_TRAIN_YEAR
+    bounds = {}
+    for col in beta_cols:
+        hi = float(beta_df.loc[train, col].quantile(1 - q))
+        n_clip = int((beta_df[col] > hi).sum())
+        beta_df[col] = beta_df[col].clip(upper=hi)
+        bounds[col] = (hi, n_clip)
+        print(f"  winsorize {col}: upper cap={hi:+.3f}  clipped={n_clip}")
+    return beta_df, bounds
 
 
 def load_factor_scores():
@@ -266,6 +300,10 @@ def estimate_all_betas():
 
     beta_df = pd.DataFrame(results)
     diag_df = pd.DataFrame(diagnostics)
+
+    beta_cols = [f"beta_{fcol}" for fcol in FACTOR_COLS]
+    print("\nWinsorizing factor betas (train-only upper-tail 99th-percentile cap):")
+    beta_df, _ = winsorize_betas(beta_df, beta_cols)
 
     output_dir = os.path.dirname(os.path.abspath(__file__))
     beta_df.to_csv(os.path.join(output_dir, "country_year_betas.csv"), index=False)

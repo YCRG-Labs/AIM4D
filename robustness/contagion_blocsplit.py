@@ -56,7 +56,7 @@ def build_pools(countries):
             A[idx[b], idx[a]] = 1
     near = A.copy()
     far = 1.0 - A
-    np.fill_diagonal(far, 0.0)  # exclude self from far pool
+    np.fill_diagonal(far, 0.0)
 
     def rn(W):
         rs = W.sum(axis=1, keepdims=True)
@@ -70,7 +70,7 @@ def build_panel(df, countries, years, Y, Wn, Wf, lag=0):
     for ti in range(1, len(years)):
         t = years[ti]
         dy = Y[:, ti] - Y[:, ti - 1]
-        si = ti - 1 - lag  # neighbour change used (lag years earlier)
+        si = ti - 1 - lag
         if si < 1:
             src = np.zeros(len(countries))
         else:

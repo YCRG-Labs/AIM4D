@@ -40,7 +40,7 @@ def run_pipeline(cutoff):
                   "stage3_msvar/estimate.py", "stage4_nscm/estimate.py",
                   "stage5_ews/estimate.py"]:
         path = os.path.join(REPO, stage)
-        rc = subprocess.call(["python3", path], env=env, cwd=REPO)
+        rc = subprocess.call([sys.executable, path], env=env, cwd=REPO)
         if rc != 0:
             print(f"  [FAIL] {stage} returned {rc}", flush=True)
             return rc

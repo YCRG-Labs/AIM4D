@@ -27,6 +27,10 @@ POSTONSET_EXCL_YEARS_ENV = int(os.environ.get("AIM4D_POSTONSET", "5"))
 WATCH_PCTL = float(os.environ.get("AIM4D_WATCH_PCTL", "0.80"))
 WARNING_PCTL = float(os.environ.get("AIM4D_WARNING_PCTL", "0.95"))
 ALERT_PCTL = float(os.environ.get("AIM4D_ALERT_PCTL", "0.98"))
+SEED_OFFSET = int(os.environ.get("AIM4D_SEED_OFFSET", "0"))
+NO_WRITE = (os.environ.get("AIM4D_NO_WRITE") == "1"
+            or bool(os.environ.get("AIM4D_ABLATE_GROUP", "").strip())
+            or SEED_OFFSET != 0)
 
 
 def lead_for(info):
@@ -487,7 +491,8 @@ def run_ews():
 
     ews_df = pd.DataFrame(all_ews)
     output_dir = os.path.dirname(os.path.abspath(__file__))
-    ews_df.to_csv(os.path.join(output_dir, "ews_signals.csv"), index=False)
+    if not NO_WRITE:
+        ews_df.to_csv(os.path.join(output_dir, "ews_signals.csv"), index=False)
 
     print(f"\n{'='*60}")
     print(f"Election vulnerability module")
@@ -939,6 +944,19 @@ def run_ews():
     print(f"  [diag] available_base sample: {sorted(available_base)[:15]}")
     print(f"  [diag] ews_df cols total: {len(ews_df.columns)}")
 
+    ablate_group = os.environ.get("AIM4D_ABLATE_GROUP", "").strip().lower()
+    if ablate_group:
+        ABLATE_MAP = {
+            "stage4": ["network_exposure", "csd_x_network"],
+        }
+        markers = ABLATE_MAP.get(ablate_group)
+        if markers is None:
+            raise ValueError(f"AIM4D_ABLATE_GROUP='{ablate_group}' not in {list(ABLATE_MAP)}")
+        before = len(all_meta)
+        all_meta = [f for f in all_meta if not any(m in f for m in markers)]
+        print(f"  [ablation] AIM4D_ABLATE_GROUP={ablate_group}: dropped "
+              f"{before - len(all_meta)} stage-derived features (markers={markers})")
+
     label_decay = 2.0
     known_w_soft = {}
     for c, info in KNOWN_EPISODES.items():
@@ -1013,7 +1031,7 @@ def run_ews():
             return gb
 
         gb_models = Parallel(n_jobs=-1, backend="loky")(
-            delayed(_fit_gb)(s) for s in range(N_SEEDS)
+            delayed(_fit_gb)(s) for s in range(SEED_OFFSET, SEED_OFFSET + N_SEEDS)
         )
         gb_risks = [m.predict_proba(X_selected)[:, 1] for m in gb_models]
         meta_gb = gb_models[0]
@@ -1026,7 +1044,7 @@ def run_ews():
                 iterations=1500, depth=5, learning_rate=0.03,
                 l2_leaf_reg=5, bootstrap_type="Bayesian",
                 bagging_temperature=1.0, auto_class_weights="SqrtBalanced",
-                random_seed=42, verbose=0, allow_writing_files=False,
+                random_seed=42 + SEED_OFFSET, verbose=0, allow_writing_files=False,
             )
             cb.fit(X_selected[train_mask], y_meta[train_mask],
                    sample_weight=train_weights[train_mask])
@@ -1038,13 +1056,13 @@ def run_ews():
         from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
         rf = RandomForestClassifier(n_estimators=500, max_depth=10,
                                     min_samples_leaf=10, class_weight="balanced",
-                                    random_state=42, n_jobs=-1)
+                                    random_state=42 + SEED_OFFSET, n_jobs=-1)
         rf.fit(X_selected[train_mask], y_meta[train_mask],
                sample_weight=train_weights[train_mask])
         rf_risk = rf.predict_proba(X_selected)[:, 1]
         et = ExtraTreesClassifier(n_estimators=500, max_depth=10,
                                   min_samples_leaf=10, class_weight="balanced",
-                                  random_state=42, n_jobs=-1)
+                                  random_state=42 + SEED_OFFSET, n_jobs=-1)
         et.fit(X_selected[train_mask], y_meta[train_mask],
                sample_weight=train_weights[train_mask])
         et_risk = et.predict_proba(X_selected)[:, 1]
@@ -1226,7 +1244,10 @@ def run_ews():
 
     ews_df["combined_risk"] = ews_df["calibrated_risk"] if "calibrated_risk" in ews_df.columns else ews_df["csd_index"]
 
-    ews_df.to_csv(os.path.join(output_dir, "ews_signals.csv"), index=False)
+    if not NO_WRITE:
+        ews_df.to_csv(os.path.join(output_dir, "ews_signals.csv"), index=False)
+    else:
+        print("  (ews_signals.csv write skipped: ablation/seed-offset run)")
 
     print(f"\n{'='*60}")
     print(f"Validation: episode detection + precision@K")
@@ -1342,7 +1363,10 @@ def run_ews():
     loeo_total = 0
     loeo_risks = []
 
-    for held_out_country, held_out_info in KNOWN_EPISODES.items():
+    loeo_items = [] if os.environ.get("AIM4D_SKIP_LOEO") == "1" else list(KNOWN_EPISODES.items())
+    if not loeo_items:
+        print("  (LOEO skipped: AIM4D_SKIP_LOEO=1)")
+    for held_out_country, held_out_info in loeo_items:
         held_out_onset = held_out_info["onset"]
 
         held_lead = lead_for(held_out_info)
@@ -1483,8 +1507,22 @@ def run_ews():
         if oos["label"].sum() > 0 and oos["label"].nunique() > 1:
             auc_roc_oos = roc_auc_score(oos["label"], oos["combined_risk"])
             auc_pr_oos = average_precision_score(oos["label"], oos["combined_risk"])
+            oos_base_rate = oos["label"].mean()
             print(f"  AUC-ROC (OOS): {auc_roc_oos:.3f}")
             print(f"  AUC-PR (OOS):  {auc_pr_oos:.3f}")
+            import json as _json
+            print("ABLATE_JSON " + _json.dumps({
+                "ablate_group": os.environ.get("AIM4D_ABLATE_GROUP", "").strip().lower() or "full",
+                "seed_offset": SEED_OFFSET,
+                "n_features": len(all_meta),
+                "oos_roc": round(float(auc_roc_oos), 4),
+                "oos_pr": round(float(auc_pr_oos), 4),
+                "oos_base_rate": round(float(oos_base_rate), 4),
+                "oos_n": int(len(oos)),
+                "oos_n_pos": int(oos["label"].sum()),
+                "is_roc": round(float(auc_roc), 4),
+                "is_pr": round(float(auc_pr), 4),
+            }))
 
         top_pctiles = [99, 95, 90, 80]
         print(f"\n  Risk score calibration:")

@@ -98,16 +98,16 @@ def main():
     for c, g in e.groupby("country_text_id"):
         g = g.sort_values("year")
         m = (g["mob_z"] - g["mob_z"].mean()).values
-        d = (g["f1_change"] - g["f1_change"].mean()).values  # decline = negative f1_change
+        d = (g["f1_change"] - g["f1_change"].mean()).values
         if len(g) < 8 or np.nanstd(m) == 0 or np.nanstd(d) == 0:
             continue
         for k in (1, 2, 3):
             if len(g) > k:
-                a, b = m[:-k], d[k:]  # mob_t vs decline_{t+k}
+                a, b = m[:-k], d[k:]
                 ok = ~np.isnan(a) & ~np.isnan(b)
                 if ok.sum() > 3:
                     fwd.append(np.corrcoef(a[ok], b[ok])[0, 1])
-                a2, b2 = d[:-k], m[k:]  # decline_t vs mob_{t+k}
+                a2, b2 = d[:-k], m[k:]
                 ok2 = ~np.isnan(a2) & ~np.isnan(b2)
                 if ok2.sum() > 3:
                     rev.append(np.corrcoef(a2[ok2], b2[ok2])[0, 1])

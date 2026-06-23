@@ -11,13 +11,17 @@ toward a constant) suppresses the spurious positive transition spike but also
 reverses the substantively meaningful negative onset signal, because both come
 from the same mechanism.
 
-A Student-t observation density is the principled fix: its score down-weights a
-single large innovation (the 1989 jump) without forcing the random-walk corner,
-while a sustained multi-year counter-movement (Hungary's 2009-2011 onset) is not a
-lone outlier and survives. This script estimates the robust filter and reports,
-for the Factor-1 Kalman loading, that it (i) suppresses the 1989 spike and (ii)
-preserves the negative 2010 onset, and that across the panel the robust loadings
-agree closely with the upper-tail-winsorized series used in the main text.
+A Student-t observation density is the natural principled candidate, but it does
+NOT rescue the asymmetry. Estimated by MLE, the heavy-tailed filter drives the
+state-innovation variance to its LOWER boundary and flattens Hungary's Factor-1
+loading to a near constant (~+0.6 throughout), erasing not just the 1989 spike but
+the substantively meaningful 2009-2011 negative onset as well. This script
+documents both failed alternatives, tightening the Gaussian state variance (which
+flips the 2010 sign) and the Student-t filter (which flattens the series), and is
+the evidence that no symmetric or robust estimator separates the spurious positive
+transition spike from the genuine negative onset, because the two are statistically
+identical. The directional upper-tail winsorization used in the main text is
+therefore justified on substantive, not statistical, grounds.
 """
 
 import os

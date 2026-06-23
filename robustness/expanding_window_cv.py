@@ -1,7 +1,7 @@
 """
 Task E: real expanding-window cross-validation with full-pipeline refit.
 
-For each cutoff year in [2008, 2011, 2014, 2017, 2019], refit all five stages
+For each cutoff year in [2008, 2011, 2014, 2017], refit all five stages
 (POET factors, Kalman/DCC betas, MS-VAR HMM, INE-TARNet, EWS meta-learner) on
 data <= cutoff, then evaluate OOS AUC and AUC-PR on the next 3-year window.
 

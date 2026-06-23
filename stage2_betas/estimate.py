@@ -14,16 +14,19 @@ WINSOR_Q = float(os.environ.get("AIM4D_BETA_WINSOR", "0.01"))
 
 
 def winsorize_betas(beta_df, beta_cols, q=WINSOR_Q):
-    """Cap the upper-tail variance-collapse artifacts before they propagate.
+    """Cap the upper-tail transition-era artifacts before they propagate.
 
     The state-space estimator produces spuriously large POSITIVE loadings
-    during synchronized democratization waves, when the collapse in
-    cross-country variance inflates every country's loading: the 1989-1992
-    Eastern-Bloc transitions dominate the right tail (Albania +20, Bulgaria
-    +17, Romania +15, Hungary +14), an order of magnitude beyond the bulk of
-    the distribution. Left raw, this cluster inflates the column mean/std used
-    to standardize every other country's node feature in Stage 4 and pushes
-    the beta panel of Figure 5 off-scale.
+    during synchronized democratization waves: the Gaussian TVP likelihood
+    pins the state-innovation variance at its upper bound, so the filtered
+    loading behaves as a near random walk and tracks the ratio of a country's
+    idiosyncratic move to a small contemporaneous global change (Stock &
+    Watson 1998; Harvey & Luati 2014). The 1989-1992 Eastern-Bloc transitions
+    dominate the right tail (Albania +20, Bulgaria +17, Romania +15, Hungary
+    +14), an order of magnitude beyond the bulk of the distribution. Left raw,
+    this cluster inflates the column mean/std used to standardize every other
+    country's node feature in Stage 4 and pushes the beta panel of Figure 5
+    off-scale.
 
     We winsorize the UPPER tail of each beta column at its (1-q) training
     percentile. The artifact is directional: the lower tail is retained

@@ -118,6 +118,7 @@ def main():
     print(f"  mobilization importance range [{imp_df['mobilization'].min():.4f}, {imp_df['mobilization'].max():.4f}]; "
           f"digital control range [{imp_df['digital control'].min():.4f}, {imp_df['digital control'].max():.4f}]")
     summary.to_csv(os.path.join(OUTPUT_DIR, "rashomon_importance_results.csv"))
+    imp_df.to_csv(os.path.join(OUTPUT_DIR, "rashomon_importance_per_model.csv"), index=False)
     print(f"\nSaved to robustness/rashomon_importance_results.csv")
 
 

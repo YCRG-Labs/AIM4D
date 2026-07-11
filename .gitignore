@@ -8,3 +8,5 @@ __pycache__/
 .backup_*/
 .refit_worktrees/
 run_all_local.log
+run_phase2_local.log
+k_sens_rerun.log

@@ -98,7 +98,7 @@ def run(df, countries, years, Y, Wn, Wf, lag, label):
     bn, bf = m.params["near"], m.params["far"]
     pn, pf = m.pvalues["near"], m.pvalues["far"]
     wald = m.t_test("near - far = 0")
-    diff_p = float(np.ravel(wald.pvalue))
+    diff_p = float(np.ravel(wald.pvalue)[0])
     print(f"  {label}: near={bn:+.4f}(p={pn:.3f})  far={bf:+.4f}(p={pf:.3f})  "
           f"near-far={bn - bf:+.4f}(p={diff_p:.3f})")
     return {f"{label}_near": bn, f"{label}_near_p": pn, f"{label}_far": bf,

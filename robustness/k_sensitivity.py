@@ -224,7 +224,7 @@ def run_ews_detection(factor_df, K):
         if len(cdf) < MIN_WINDOW + 2:
             continue
         for rc in resid_cols:
-            rv, _, _ = rolling_stats(cdf[rc].values)
+            rv = rolling_stats(cdf[rc].values)[0]
             tv = rv[np.array(cdf["year"].values) <= TRAIN_CUTOFF]
             all_train_vars.extend(tv[~np.isnan(tv)])
 
@@ -246,7 +246,7 @@ def run_ews_detection(factor_df, K):
         max_abs = np.full(len(years), np.nan)
 
         for rc in resid_cols:
-            rv, ra, rk = rolling_stats(cdf[rc].values)
+            rv, ra, rk = rolling_stats(cdf[rc].values)[:3]
             vz = country_z(rv, years)
             az = country_z(ra, years)
             kz = country_z(rk, years)

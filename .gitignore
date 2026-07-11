@@ -10,3 +10,6 @@ __pycache__/
 run_all_local.log
 run_phase2_local.log
 k_sens_rerun.log
+quality_reports/
+sanity_rerun.log
+enet_rerun.log

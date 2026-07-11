@@ -99,9 +99,13 @@ def factor_sanity(n_perm=20):
         above += flag
         print(f"    factor {k+1}: real={real_evals[k]:.2f}  null95={null_95[k]:.2f}  "
               f"{'ABOVE (retained)' if flag else 'below'}")
-    return {"factor_perm_congruence_mean": perm_congr.mean(),
-            "factor_perm_congruence_sd": perm_congr.std(),
-            "factors_above_null": int(above)}
+    out = {"factor_perm_congruence_mean": perm_congr.mean(),
+           "factor_perm_congruence_sd": perm_congr.std(),
+           "factors_above_null": int(above)}
+    for k in range(K):
+        out[f"eigenvalue_f{k+1}"] = float(real_evals[k])
+        out[f"null95_f{k+1}"] = float(null_95[k])
+    return out
 
 
 def build_sequences():

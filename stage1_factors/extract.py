@@ -1,6 +1,11 @@
 import sys
 import os
 import re
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "BLIS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_v, "4")
+
 import numpy as np
 import pandas as pd
 from scipy import linalg
@@ -53,11 +58,10 @@ def build_panel(df, indicators, min_year=MIN_YEAR):
 
     panel = panel.dropna(subset=indicators, thresh=int(len(indicators) * ROW_THRESH))
 
-    for col in indicators:
-        panel[col] = pd.to_numeric(panel[col], errors="coerce")
-        panel[col] = panel.groupby("country_name")[col].transform(
-            lambda x: x.infer_objects(copy=False).interpolate(limit_direction="both")
-        )
+    panel[indicators] = panel[indicators].apply(pd.to_numeric, errors="coerce")
+    panel[indicators] = panel.groupby("country_name")[indicators].transform(
+        lambda x: x.interpolate(limit_direction="both")
+    )
 
     panel = panel.dropna(subset=indicators)
 

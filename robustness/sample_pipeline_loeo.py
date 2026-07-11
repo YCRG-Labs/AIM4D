@@ -1,17 +1,18 @@
 """
-Task F: 5-episode full-pipeline leave-one-out validation.
+Task F: 15-episode full-pipeline leave-one-out validation.
 
-For each of 5 sample episodes (varied across era and type), refit the entire
+For each sample episode (varied across era and type), refit the entire
 pipeline with that country's data EXCLUDED from the training subsets at
 Stages 1, 3, and 5. The country still appears in the panel for prediction
 (loadings/HMM/meta-learner are applied to it after training without it).
 
 The cheap LOEO in Stage 5 only refits the meta-learner; this script bounds
-the upstream contamination by running ~5 full-pipeline LOEOs and comparing.
+the upstream contamination by running full-pipeline LOEOs and comparing.
 
-Run time: ~30-45 min per episode * 5 episodes = 2.5-4 hr total.
-Heaviest step is the Stage 3 HMM (60 random restarts) which gets rerun each
-episode.
+Episodes run concurrently, each in its own detached git worktree (data/
+symlinked from the canonical checkout), so refits never touch the canonical
+stage outputs and no restore pass is needed. Concurrency defaults to a
+RAM/CPU-derived worker count; override with AIM4D_PAR.
 
 Outputs:
   robustness/sample_pipeline_loeo.csv  — per-episode max risk, detection tier,
@@ -19,12 +20,14 @@ Outputs:
 """
 
 import os
-import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _refit_worktree import (REPO, add_worktree, default_workers, refit_env,
+                             remove_worktree, run_stages, warn_if_dirty)
+
 OUT = os.path.dirname(os.path.abspath(__file__))
 
 SAMPLE_EPISODES = [
@@ -53,25 +56,29 @@ if _smoke_limit > 0:
 LEAD = 5
 
 
-def run_full_pipeline(exclude_country):
-    """Refit stages 1-5 with one country excluded from training subsets."""
-    env = os.environ.copy()
-    env["AIM4D_EXCLUDE_COUNTRY"] = exclude_country
-    env["AIM4D_CUTOFF"] = "2019"
-    for stage in ["stage1_factors/extract.py", "stage2_betas/estimate.py",
-                  "stage3_msvar/estimate.py", "stage4_nscm/estimate.py",
-                  "stage5_ews/estimate.py"]:
-        path = os.path.join(REPO, stage)
-        rc = subprocess.call(["python3", path], env=env, cwd=REPO)
+def run_episode(item):
+    country, onset, ep_type = item
+    print(f"Full-pipeline LOEO {country} ({onset}, {ep_type}): starting refit "
+          f"in worktree", flush=True)
+    worktree = add_worktree(f"loeo_{country}")
+    try:
+        env = refit_env(AIM4D_CUTOFF=2019, AIM4D_EXCLUDE_COUNTRY=country)
+        rc = run_stages(worktree, env, label=f" episode={country}")
         if rc != 0:
-            print(f"  [FAIL] {stage} returned {rc}", flush=True)
-            return rc
-    return 0
+            return {"country": country, "onset": onset, "type": ep_type,
+                    "error": f"pipeline rc={rc}"}
+        max_risk, best_tier, all_tiers = collect_predictions(country, onset,
+                                                             repo=worktree)
+        return {"country": country, "onset": onset, "type": ep_type,
+                "max_risk": max_risk, "best_tier": best_tier,
+                "all_tiers": all_tiers}
+    finally:
+        remove_worktree(worktree)
 
 
-def collect_predictions(country, onset):
+def collect_predictions(country, onset, repo=REPO):
     """Read ews_signals.csv and return the country's pre-onset risk and tier."""
-    ews = pd.read_csv(os.path.join(REPO, "stage5_ews/ews_signals.csv"))
+    ews = pd.read_csv(os.path.join(repo, "stage5_ews/ews_signals.csv"))
     pre = ews[(ews["country_name"] == country)
               & (ews["year"] >= onset - LEAD)
               & (ews["year"] < onset)]
@@ -110,26 +117,31 @@ def main():
             "or:  pip install --user -r requirements.txt"
         )
     meta_only = load_meta_only_loeo()
+    warn_if_dirty()
+
+    workers = min(default_workers(), len(SAMPLE_EPISODES))
+    print(f"Running {len(SAMPLE_EPISODES)} episodes across {workers} concurrent "
+          f"worktrees (AIM4D_THREADS={os.environ.get('AIM4D_THREADS', '4')})",
+          flush=True)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(run_episode, SAMPLE_EPISODES))
+
     rows = []
-
-    for country, onset, ep_type in SAMPLE_EPISODES:
-        print(f"\n{'=' * 70}")
-        print(f"Full-pipeline LOEO: {country} ({onset}, {ep_type})")
-        print(f"{'=' * 70}", flush=True)
-
-        rc = run_full_pipeline(country)
-        if rc != 0:
-            rows.append({"country": country, "onset": onset, "type": ep_type,
-                         "error": f"pipeline rc={rc}"})
+    for res in results:
+        if "error" in res:
+            rows.append({"country": res["country"], "onset": res["onset"],
+                         "type": res["type"], "error": res["error"]})
+            print(f"  {res['country']}: FAILED ({res['error']})")
             continue
 
-        max_risk, best_tier, all_tiers = collect_predictions(country, onset)
+        country, onset = res["country"], res["onset"]
+        max_risk, best_tier, all_tiers = res["max_risk"], res["best_tier"], res["all_tiers"]
         meta_risk, meta_tier = meta_only.get(country, (np.nan, "n/a"))
 
         delta = max_risk - meta_risk if (max_risk is not None and not np.isnan(meta_risk)) else np.nan
 
         row = {
-            "country": country, "onset": onset, "type": ep_type,
+            "country": country, "onset": onset, "type": res["type"],
             "full_pipeline_max_risk": max_risk,
             "full_pipeline_tier": best_tier,
             "meta_only_max_risk": meta_risk,
@@ -138,8 +150,11 @@ def main():
             "tier_breakdown": str(all_tiers),
         }
         rows.append(row)
-        print(f"  -> full-pipeline LOEO max_risk={max_risk:.4f} tier={best_tier}", flush=True)
-        print(f"     meta-only      LOEO max_risk={meta_risk:.4f} tier={meta_tier}")
+        if max_risk is None:
+            print(f"  {country}: no scorable pre-onset rows", flush=True)
+            continue
+        print(f"  {country}: full-pipeline max_risk={max_risk:.4f} tier={best_tier}", flush=True)
+        print(f"     meta-only      max_risk={meta_risk:.4f} tier={meta_tier}")
         print(f"     delta (full - meta) = {delta:+.4f}")
 
     df = pd.DataFrame(rows)
@@ -159,15 +174,8 @@ def main():
         print(f"is a good proxy for full-pipeline LOEO. Large delta means upstream")
         print(f"contamination matters and meta-only LOEO is optimistic.")
     print(f"\nWrote {out_path}")
-
-    print(f"\nRestoring canonical pipeline state (no country excluded)...")
-    env = os.environ.copy()
-    env.pop("AIM4D_EXCLUDE_COUNTRY", None)
-    env["AIM4D_CUTOFF"] = "2019"
-    for stage in ["stage1_factors/extract.py", "stage2_betas/estimate.py",
-                  "stage3_msvar/estimate.py", "stage4_nscm/estimate.py",
-                  "stage5_ews/estimate.py"]:
-        subprocess.call(["python3", os.path.join(REPO, stage)], env=env, cwd=REPO)
+    print("Refits ran in isolated worktrees; canonical stage outputs untouched, "
+          "no restore pass needed.")
 
 
 if __name__ == "__main__":

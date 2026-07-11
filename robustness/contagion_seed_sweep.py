@@ -19,6 +19,7 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
+from joblib import Parallel, delayed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from stage4_nscm.estimate import (
@@ -26,6 +27,34 @@ from stage4_nscm.estimate import (
     build_spatial_edges, build_spatiotemporal_graph,
     load_all_data, train_model,
 )
+
+
+def _sweep_one(s, x, y, edge_index, full_ei, spatial_ei, mask_train, mask_test,
+               in_dim, node_country, node_year, name_map, target_year):
+    torch.set_num_threads(max(1, int(os.environ.get("AIM4D_SWEEP_THREADS", "1"))))
+    model = train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=s)
+
+    with torch.no_grad():
+        _, domestic, spillover = model.counterfactual_decompose(x, full_ei, spatial_ei)
+
+    rows = []
+    for nid in range(len(node_country)):
+        if node_year[nid] != target_year:
+            continue
+        country_name = name_map.get(node_country[nid], node_country[nid])
+        if country_name not in FOCUS:
+            continue
+        spill_mag = spillover[nid].abs().sum().item()
+        dom_mag = domestic[nid].abs().sum().item()
+        total = spill_mag + dom_mag + 1e-10
+        contagion = spill_mag / total
+        rows.append({
+            "seed": s,
+            "country": country_name,
+            "contagion": contagion,
+            "domestic": 1 - contagion,
+        })
+    return rows
 
 
 FOCUS = [
@@ -77,31 +106,19 @@ def main():
     full_ei = torch.cat([spatial_ei, temporal_ei], dim=1)
     name_map = df.drop_duplicates("country_text_id").set_index("country_text_id")["country_name"].to_dict()
 
-    all_rows = []
-    for s in range(args.seeds):
-        print(f"\n=== Seed {s} ===")
-        model = train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=s)
+    n_jobs = int(os.environ.get("AIM4D_SWEEP_JOBS",
+                                str(min(args.seeds, max(1, (os.cpu_count() or 4) - 1)))))
+    seed_rows = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(_sweep_one)(s, x, y, edge_index, full_ei, spatial_ei,
+                            mask_train, mask_test, in_dim, node_country,
+                            node_year, name_map, args.target_year)
+        for s in range(args.seeds)
+    )
 
-        with torch.no_grad():
-            _, domestic, spillover = model.counterfactual_decompose(x, full_ei, spatial_ei)
-
-        for nid in range(len(node_country)):
-            if node_year[nid] != args.target_year:
-                continue
-            country_name = name_map.get(node_country[nid], node_country[nid])
-            if country_name not in FOCUS:
-                continue
-            spill_mag = spillover[nid].abs().sum().item()
-            dom_mag = domestic[nid].abs().sum().item()
-            total = spill_mag + dom_mag + 1e-10
-            contagion = spill_mag / total
-            all_rows.append({
-                "seed": s,
-                "country": country_name,
-                "contagion": contagion,
-                "domestic": 1 - contagion,
-            })
-            print(f"  {country_name:<30} contagion={contagion:.3f}  domestic={1-contagion:.3f}")
+    all_rows = [r for rows in seed_rows for r in rows]
+    for row in all_rows:
+        print(f"  seed {row['seed']} {row['country']:<30} "
+              f"contagion={row['contagion']:.3f}  domestic={row['domestic']:.3f}")
 
     out = pd.DataFrame(all_rows)
     out_path = os.path.join(os.path.dirname(__file__), "contagion_seed_sweep.csv")

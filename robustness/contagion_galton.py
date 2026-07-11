@@ -139,6 +139,12 @@ def main():
         print(f"  {name}: cultural alpha={a:+.4f}  t={t:.2f}  p={pv:.3f}  [{flag}]{extra}")
         key = name.split()[0]
         out[f"{key}_cult_alpha"], out[f"{key}_cult_p"] = a, pv
+        if "wdy_contig" in m.params:
+            out[f"{key}_geo_alpha"] = m.params["wdy_contig"]
+            out[f"{key}_geo_p"] = m.pvalues["wdy_contig"]
+        if "glob" in m.params:
+            out[f"{key}_glob_alpha"] = m.params["glob"]
+            out[f"{key}_glob_p"] = m.pvalues["glob"]
     survives = out["M4_cult_p"] < 0.05
     print(f"\n  => cultural diffusion {'SURVIVES' if survives else 'does NOT survive'} the full horse race "
           f"(geo + global precedent + region FE)")

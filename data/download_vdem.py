@@ -26,7 +26,10 @@ def load_vdem(path=None):
     if not os.path.exists(path):
         path = download_vdem()
 
-    df = pd.read_csv(path, low_memory=False)
+    header = pd.read_csv(path, nrows=0)
+    keep = [c for c in header.columns
+            if c in ("country_name", "country_text_id", "year") or c.startswith("v2")]
+    df = pd.read_csv(path, low_memory=False, usecols=keep)
     print(f"V-Dem loaded: {df.shape[0]} rows, {df.shape[1]} columns")
     print(f"Countries: {df['country_name'].nunique()}, Years: {df['year'].min()}-{df['year'].max()}")
     return df

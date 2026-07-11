@@ -9,45 +9,47 @@ This is the only honest version of expanding-window CV for the AIM4D pipeline.
 The version inside Stage 5's run loop only slices a single in-sample model's
 predictions and does not refit.
 
-Run time: roughly 30-60 min per fold (~2-5 hr total on a modern laptop, less
-on Brev). Heaviest step is the Stage 3 HMM with 60 random restarts.
+Folds run concurrently, each in its own detached git worktree (data/
+symlinked from the canonical checkout), so refits never touch the canonical
+stage outputs. Concurrency defaults to a RAM/CPU-derived worker count;
+override with AIM4D_PAR. Heaviest step per fold is the Stage 3 HMM.
 
 Outputs:
   robustness/expanding_window_cv.csv  — per-fold AUC, AUC-PR, n_pos, episodes
 """
 
 import os
-import subprocess
 import sys
-import json
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score, average_precision_score
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from _refit_worktree import (REPO, add_worktree, default_workers, refit_env,
+                             remove_worktree, run_stages, warn_if_dirty)
+
 OUT = os.path.dirname(os.path.abspath(__file__))
 
 CUTOFFS = [2008, 2011, 2014, 2017]
 LEAD = 5
 
 
-def run_pipeline(cutoff):
-    """Refit stages 1-5 with the given cutoff. Returns 0 on success."""
-    env = os.environ.copy()
-    env["AIM4D_CUTOFF"] = str(cutoff)
-    env.pop("AIM4D_EXCLUDE_COUNTRY", None)
-    for stage in ["stage1_factors/extract.py", "stage2_betas/estimate.py",
-                  "stage3_msvar/estimate.py", "stage4_nscm/estimate.py",
-                  "stage5_ews/estimate.py"]:
-        path = os.path.join(REPO, stage)
-        rc = subprocess.call([sys.executable, path], env=env, cwd=REPO)
+def run_fold(cutoff):
+    test_end = cutoff + 3
+    print(f"Fold train<={cutoff}: starting refit in worktree", flush=True)
+    worktree = add_worktree(f"ewcv_{cutoff}")
+    try:
+        env = refit_env(AIM4D_CUTOFF=cutoff, AIM4D_EXCLUDE_COUNTRY=None)
+        rc = run_stages(worktree, env, label=f" fold={cutoff}")
         if rc != 0:
-            print(f"  [FAIL] {stage} returned {rc}", flush=True)
-            return rc
-    return 0
+            return {"cutoff": cutoff, "test_end": test_end,
+                    "auc": np.nan, "ap": np.nan, "error": f"pipeline rc={rc}"}
+        return evaluate_fold(cutoff, test_end, repo=worktree)
+    finally:
+        remove_worktree(worktree)
 
 
-def evaluate_fold(cutoff, test_window_end):
+def evaluate_fold(cutoff, test_window_end, repo=REPO):
     """Read ews_signals.csv, score OOS on (cutoff, test_window_end]."""
     sys.path.insert(0, REPO)
     from stage5_ews.estimate import KNOWN_EPISODES
@@ -59,7 +61,7 @@ def evaluate_fold(cutoff, test_window_end):
         for y in range(o + 1, o + 6):
             postonset.add((c, y))
 
-    ews = pd.read_csv(os.path.join(REPO, "stage5_ews/ews_signals.csv"))
+    ews = pd.read_csv(os.path.join(repo, "stage5_ews/ews_signals.csv"))
     ews["lbl"] = ews.apply(lambda r: 1 if (r["country_name"], r["year"]) in preonset else 0, axis=1)
     ews["pos"] = ews.apply(lambda r: (r["country_name"], r["year"]) in postonset, axis=1)
 
@@ -81,21 +83,19 @@ def evaluate_fold(cutoff, test_window_end):
 
 
 def main():
-    rows = []
-    for cutoff in CUTOFFS:
-        test_end = cutoff + 3
-        print(f"\n{'=' * 70}")
-        print(f"Fold: train <= {cutoff}, test ({cutoff + 1}-{test_end})")
-        print(f"{'=' * 70}", flush=True)
-        rc = run_pipeline(cutoff)
-        if rc != 0:
-            rows.append({"cutoff": cutoff, "test_end": test_end,
-                         "auc": np.nan, "ap": np.nan, "error": f"pipeline rc={rc}"})
-            continue
-        r = evaluate_fold(cutoff, test_end)
-        rows.append(r)
-        print(f"  -> AUC={r['auc']:.3f}, AP={r['ap']:.3f}, n_pos={r['n_pos']}, "
-              f"episodes={r['episodes_in_window']}", flush=True)
+    warn_if_dirty()
+    workers = min(default_workers(), len(CUTOFFS))
+    print(f"Running {len(CUTOFFS)} folds across {workers} concurrent worktrees "
+          f"(AIM4D_THREADS={os.environ.get('AIM4D_THREADS', '4')})", flush=True)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        rows = list(pool.map(run_fold, CUTOFFS))
+
+    for r in rows:
+        if "error" in r:
+            print(f"  fold {r['cutoff']}: FAILED ({r['error']})")
+        else:
+            print(f"  fold {r['cutoff']}: AUC={r['auc']:.3f}, AP={r['ap']:.3f}, "
+                  f"n_pos={r['n_pos']}, episodes={r['episodes_in_window']}", flush=True)
 
     df = pd.DataFrame(rows)
     out_path = os.path.join(OUT, "expanding_window_cv.csv")

@@ -6,3 +6,5 @@ data/*.pkl
 *.zip
 __pycache__/
 .backup_*/
+.refit_worktrees/
+run_all_local.log

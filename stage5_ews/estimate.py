@@ -1,8 +1,14 @@
 import sys
 import os
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "BLIS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_v, "4")
+
 import numpy as np
 import pandas as pd
 from scipy import stats
+from joblib import Parallel, delayed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -1045,6 +1051,7 @@ def run_ews():
                 l2_leaf_reg=5, bootstrap_type="Bayesian",
                 bagging_temperature=1.0, auto_class_weights="SqrtBalanced",
                 random_seed=42 + SEED_OFFSET, verbose=0, allow_writing_files=False,
+                thread_count=int(os.environ.get("AIM4D_THREADS", "4")),
             )
             cb.fit(X_selected[train_mask], y_meta[train_mask],
                    sample_weight=train_weights[train_mask])
@@ -1177,6 +1184,7 @@ def run_ews():
                             bootstrap_type="Bayesian", bagging_temperature=1.0,
                             auto_class_weights="SqrtBalanced", random_seed=42,
                             verbose=0, allow_writing_files=False,
+                            thread_count=int(os.environ.get("AIM4D_THREADS", "4")),
                         )
                         cb_f.fit(X_tr[fold_tr], y_tr[fold_tr],
                                  sample_weight=w_tr[fold_tr])
@@ -1366,7 +1374,8 @@ def run_ews():
     loeo_items = [] if os.environ.get("AIM4D_SKIP_LOEO") == "1" else list(KNOWN_EPISODES.items())
     if not loeo_items:
         print("  (LOEO skipped: AIM4D_SKIP_LOEO=1)")
-    for held_out_country, held_out_info in loeo_items:
+
+    def _loeo_one(held_out_country, held_out_info):
         held_out_onset = held_out_info["onset"]
 
         held_lead = lead_for(held_out_info)
@@ -1379,70 +1388,79 @@ def run_ews():
         y_loeo = train_labels.values
         loeo_train = (ews_df["country_name"] != held_out_country).values
 
-        if y_loeo[loeo_train].sum() >= 3:
-            scaler_loeo = SS()
-            X_scaled = scaler_loeo.fit_transform(X_loeo)
+        if y_loeo[loeo_train].sum() < 3:
+            return None
 
-            loeo_weights = time_weights * np.where(y_loeo == 1, POS_WEIGHT, 1.0)
+        scaler_loeo = SS()
+        X_scaled = scaler_loeo.fit_transform(X_loeo)
 
-            loeo_lr = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
-            loeo_lr.fit(X_scaled[loeo_train], y_loeo[loeo_train],
-                        sample_weight=loeo_weights[loeo_train])
-            loeo_gb = GradientBoostingClassifier(
-                n_estimators=100, max_depth=3, learning_rate=0.05,
-                subsample=0.8, min_samples_leaf=20, random_state=42,
-            )
-            loeo_gb.fit(X_scaled[loeo_train], y_loeo[loeo_train],
-                        sample_weight=loeo_weights[loeo_train])
+        loeo_weights = time_weights * np.where(y_loeo == 1, POS_WEIGHT, 1.0)
 
-            pre = ews_df[(ews_df["country_name"] == held_out_country) &
-                         (ews_df["year"] >= held_out_onset - held_lead) &
-                         (ews_df["year"] < held_out_onset)]
+        loeo_lr = LogisticRegression(C=1.0, max_iter=1000, random_state=42)
+        loeo_lr.fit(X_scaled[loeo_train], y_loeo[loeo_train],
+                    sample_weight=loeo_weights[loeo_train])
+        loeo_gb = GradientBoostingClassifier(
+            n_estimators=100, max_depth=3, learning_rate=0.05,
+            subsample=0.8, min_samples_leaf=20, random_state=42,
+        )
+        loeo_gb.fit(X_scaled[loeo_train], y_loeo[loeo_train],
+                    sample_weight=loeo_weights[loeo_train])
 
-            if len(pre) > 0:
-                loeo_total += 1
-                pre_idx = pre.index
-                pre_risk = w_lr * loeo_lr.predict_proba(X_scaled[pre_idx])[:, 1] + \
-                           w_gb * loeo_gb.predict_proba(X_scaled[pre_idx])[:, 1]
-                max_risk = pre_risk.max()
-                train_preds = w_lr * loeo_lr.predict_proba(X_scaled[loeo_train])[:, 1] + \
-                              w_gb * loeo_gb.predict_proba(X_scaled[loeo_train])[:, 1]
+        pre = ews_df[(ews_df["country_name"] == held_out_country) &
+                     (ews_df["year"] >= held_out_onset - held_lead) &
+                     (ews_df["year"] < held_out_onset)]
 
-                train_y = y_loeo[loeo_train]
-                neg_preds = train_preds[train_y == 0]
-                if len(neg_preds) >= 50:
-                    thresh_alert = np.percentile(neg_preds, 98)
-                    thresh_warning = np.percentile(neg_preds, 95)
-                    thresh_watch = np.percentile(neg_preds, 80)
-                else:
-                    thresh_alert = np.percentile(train_preds, 98)
-                    thresh_warning = np.percentile(train_preds, 95)
-                    thresh_watch = np.percentile(train_preds, 80)
+        if len(pre) == 0:
+            return None
 
-                if max_risk > thresh_alert:
-                    tier = "alert"
-                elif max_risk > thresh_warning:
-                    tier = "warning"
-                elif max_risk > thresh_watch:
-                    tier = "watch"
-                else:
-                    tier = "none"
+        pre_idx = pre.index
+        pre_risk = w_lr * loeo_lr.predict_proba(X_scaled[pre_idx])[:, 1] + \
+                   w_gb * loeo_gb.predict_proba(X_scaled[pre_idx])[:, 1]
+        max_risk = pre_risk.max()
+        train_preds = w_lr * loeo_lr.predict_proba(X_scaled[loeo_train])[:, 1] + \
+                      w_gb * loeo_gb.predict_proba(X_scaled[loeo_train])[:, 1]
 
-                for t in ["alert", "warning", "watch"]:
-                    if tier == "alert" or (tier == "warning" and t != "alert") or (tier == "watch"):
-                        loeo_results_by_tier[t] += (1 if tier != "none" and
-                            (t == "watch" or (t == "warning" and tier in ["warning", "alert"]) or
-                             (t == "alert" and tier == "alert")) else 0)
+        train_y = y_loeo[loeo_train]
+        neg_preds = train_preds[train_y == 0]
+        if len(neg_preds) >= 50:
+            thresh_alert = np.percentile(neg_preds, 98)
+            thresh_warning = np.percentile(neg_preds, 95)
+            thresh_watch = np.percentile(neg_preds, 80)
+        else:
+            thresh_alert = np.percentile(train_preds, 98)
+            thresh_warning = np.percentile(train_preds, 95)
+            thresh_watch = np.percentile(train_preds, 80)
 
-                detected = tier != "none"
-                if detected:
-                    print(f"  {held_out_country}: DETECTED [{tier}] (LOEO, risk={max_risk:.3f})")
-                else:
-                    print(f"  {held_out_country}: MISSED (LOEO, risk={max_risk:.3f}, watch_thresh={thresh_watch:.3f})")
+        if max_risk > thresh_alert:
+            tier = "alert"
+        elif max_risk > thresh_warning:
+            tier = "warning"
+        elif max_risk > thresh_watch:
+            tier = "watch"
+        else:
+            tier = "none"
 
-                loeo_risks.append({"country": held_out_country, "max_risk": max_risk,
-                                   "tier": tier, "detected": detected,
-                                   "type": held_out_info.get("type", "")})
+        return {"country": held_out_country, "max_risk": max_risk,
+                "tier": tier, "detected": tier != "none",
+                "type": held_out_info.get("type", ""),
+                "watch_thresh": thresh_watch}
+
+    loeo_out = Parallel(n_jobs=int(os.environ.get("AIM4D_THREADS", "4")),
+                        backend="loky")(
+        delayed(_loeo_one)(c, info) for c, info in loeo_items
+    )
+
+    for res in loeo_out:
+        if res is None:
+            continue
+        loeo_total += 1
+        if res["detected"]:
+            print(f"  {res['country']}: DETECTED [{res['tier']}] (LOEO, risk={res['max_risk']:.3f})")
+        else:
+            print(f"  {res['country']}: MISSED (LOEO, risk={res['max_risk']:.3f}, watch_thresh={res['watch_thresh']:.3f})")
+        loeo_risks.append({"country": res["country"], "max_risk": res["max_risk"],
+                           "tier": res["tier"], "detected": res["detected"],
+                           "type": res["type"]})
 
     loeo_df = pd.DataFrame(loeo_risks)
     if len(loeo_df):

@@ -1,6 +1,11 @@
 import sys
 import os
 import warnings
+
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "BLIS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_v, "4")
+
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
@@ -10,6 +15,7 @@ from sklearn.linear_model import LogisticRegressionCV
 from scipy.optimize import minimize
 from scipy.special import softmax, logsumexp
 from hmmlearn import hmm
+from joblib import Parallel, delayed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -159,6 +165,45 @@ def regularize_transmat(P, n_states=N_STATES):
     return smoothed
 
 
+def _fit_one_restart(restart, X_all, lengths, init_means, init_covars_diag,
+                     init_transmat, alpha):
+    model = hmm.GaussianHMM(
+        n_components=N_STATES,
+        covariance_type="diag",
+        min_covar=0.05,
+        transmat_prior=alpha,
+        implementation="log",
+        n_iter=500,
+        tol=1e-5,
+        random_state=restart,
+        init_params="",
+    )
+
+    rng = np.random.RandomState(restart)
+    scale = 0.1 if restart < N_RESTARTS // 2 else 0.3
+    model.means_ = init_means + rng.randn(*init_means.shape) * scale if restart > 0 else init_means.copy()
+    model.covars_ = init_covars_diag.copy()
+    perturbed = init_transmat + rng.dirichlet(np.ones(N_STATES) * 10, size=N_STATES) * 0.05 if restart > 0 else init_transmat.copy()
+    perturbed /= perturbed.sum(axis=1, keepdims=True)
+    model.transmat_ = perturbed
+    model.startprob_ = np.ones(N_STATES) / N_STATES
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            model.fit(X_all, lengths)
+            score = model.score(X_all, lengths)
+            f1_means = model.means_[:, 0]
+            ordered = np.all(np.diff(f1_means) <= 0)
+            margins = -np.diff(f1_means)
+            well_separated = np.all(margins >= MIN_F1_MARGIN)
+            if ordered and well_separated:
+                return model, score
+        except Exception:
+            pass
+    return None
+
+
 def fit_baseline_hmm(X_all, lengths, init_means, init_covars):
     init_transmat = np.full((N_STATES, N_STATES), 0.005)
     for i in range(N_STATES):
@@ -176,46 +221,25 @@ def fit_baseline_hmm(X_all, lengths, init_means, init_covars):
     best_model = None
     best_score = -np.inf
 
-    for restart in range(N_RESTARTS):
-        model = hmm.GaussianHMM(
-            n_components=N_STATES,
-            covariance_type="diag",
-            min_covar=0.05,
-            transmat_prior=alpha,
-            implementation="log",
-            n_iter=500,
-            tol=1e-5,
-            random_state=restart,
-            init_params="",
+    n_jobs = int(os.environ.get("AIM4D_THREADS", "4"))
+    results = Parallel(n_jobs=n_jobs, backend="loky")(
+        delayed(_fit_one_restart)(
+            restart, X_all, lengths, init_means, init_covars_diag,
+            init_transmat, alpha,
         )
+        for restart in range(N_RESTARTS)
+    )
 
-        rng = np.random.RandomState(restart)
-        scale = 0.1 if restart < N_RESTARTS // 2 else 0.3
-        model.means_ = init_means + rng.randn(*init_means.shape) * scale if restart > 0 else init_means.copy()
-        model.covars_ = init_covars_diag.copy()
-        perturbed = init_transmat + rng.dirichlet(np.ones(N_STATES) * 10, size=N_STATES) * 0.05 if restart > 0 else init_transmat.copy()
-        perturbed /= perturbed.sum(axis=1, keepdims=True)
-        model.transmat_ = perturbed
-        model.startprob_ = np.ones(N_STATES) / N_STATES
+    for res in results:
+        if res is None:
+            continue
+        model, score = res
+        if score > best_score:
+            best_score = score
+            best_model = model
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            try:
-                model.fit(X_all, lengths)
-                score = model.score(X_all, lengths)
-                f1_means = model.means_[:, 0]
-                ordered = np.all(np.diff(f1_means) <= 0)
-                margins = -np.diff(f1_means)
-                well_separated = np.all(margins >= MIN_F1_MARGIN)
-                if ordered and well_separated and score > best_score:
-                    best_score = score
-                    best_model = model
-            except Exception:
-                continue
-
-        if (restart + 1) % 20 == 0:
-            status = f"score={best_score:.1f}" if best_model else "no valid model"
-            print(f"  Restart {restart+1}/{N_RESTARTS}: {status}")
+    status = f"score={best_score:.1f}" if best_model else "no valid model"
+    print(f"  {N_RESTARTS} restarts complete: {status}")
 
     if best_model is None:
         print("  Fallback: unconstrained + reorder")
@@ -494,6 +518,7 @@ def lasso_select(state_df, macro, covariate_cols):
         lasso = LogisticRegressionCV(
             penalty="l1", solver="saga", cv=5, Cs=20,
             multi_class="multinomial", max_iter=5000, random_state=42,
+            n_jobs=int(os.environ.get("AIM4D_THREADS", "4")),
         )
         lasso.fit(X, y)
 

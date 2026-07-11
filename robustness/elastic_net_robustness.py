@@ -2,11 +2,12 @@
 Robustness check: feature selection (elastic-net) vs all features.
 
 The Stage 5 default uses all features. Reviewers may ask: does the model still
-work with explicit feature selection? We rerun Stage 5 twice — once with all
-features, once with elastic-net pruning — and report OOS AUC, AUC-PR, and LOEO
-sensitivity for each.
-
-Run AFTER an initial Stage 5 pass. Re-runs Stage 5 once with AIM4D_USE_ENET=1.
+work with explicit feature selection? The all-features row is scored from the
+canonical Stage 5 outputs; the pruned configuration reruns Stage 5 with
+AIM4D_USE_ENET=1 inside an isolated git worktree so the canonical outputs are
+never touched. Metrics are computed directly from each run's artifacts on the
+strict 2019 protocol rather than parsed from logs. Stage 5 also persists the
+elastic-net diagnostic coefficients to stage5_ews/enet_coefficients.csv.
 
 Output: robustness/elastic_net_robustness.csv comparing the two configurations.
 """
@@ -14,70 +15,56 @@ Output: robustness/elastic_net_robustness.csv comparing the two configurations.
 import os
 import subprocess
 import sys
-import shutil
-import re
+
 import pandas as pd
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EWS = os.path.join(REPO, "stage5_ews", "ews_signals.csv")
-LOEO = os.path.join(REPO, "stage5_ews", "loeo_results.csv")
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "elastic_net_robustness.csv")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _refit_worktree import REPO, add_worktree, refit_env, remove_worktree
+from expanding_window_cv import evaluate_fold
+
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                   "elastic_net_robustness.csv")
 
 
-def run_stage5(env_overrides, label):
-    env = os.environ.copy()
-    env.update(env_overrides)
-    print(f"\n{'='*70}\nRunning Stage 5 with config: {label}\nenv: {env_overrides}\n{'='*70}")
-    proc = subprocess.run(
-        ["python3", "-u", os.path.join(REPO, "stage5_ews", "estimate.py")],
-        env=env, cwd=REPO, capture_output=True, text=True,
-    )
-    return proc.stdout + "\n" + proc.stderr
-
-
-def parse_metrics(log):
-    """Extract OOS AUC/AUC-PR, LOEO sensitivity by tier, and feature count from a Stage 5 log."""
-    out = {}
-    m = re.search(r"AUC-ROC \(OOS\):\s+([\d.]+)", log)
-    if m:
-        out["oos_auc"] = float(m.group(1))
-    m = re.search(r"AUC-PR \(OOS\):\s+([\d.]+)", log)
-    if m:
-        out["oos_auc_pr"] = float(m.group(1))
-    m = re.search(r"Base rate.*?AUC-ROC:\s+([\d.]+)", log, re.DOTALL)
-    if m:
-        out["in_sample_auc"] = float(m.group(1))
-    m = re.search(r"Base rate.*?AUC-PR:\s+([\d.]+)", log, re.DOTALL)
-    if m:
-        out["in_sample_auc_pr"] = float(m.group(1))
-    for tier, label in [("Watch \\(P80\\)", "loeo_watch"),
-                        ("Warning \\(P95\\)", "loeo_warning"),
-                        ("Alert \\(P98\\)", "loeo_alert")]:
-        m = re.search(tier + r":\s+(\d+)/(\d+)", log)
-        if m:
-            out[label] = f"{m.group(1)}/{m.group(2)}"
-            out[label + "_frac"] = int(m.group(1)) / int(m.group(2))
-    m = re.search(r"Using all (\d+) features", log)
-    if m:
-        out["n_features_used"] = int(m.group(1))
-    m = re.search(r"pruning to (\d+)/(\d+) features", log)
-    if m:
-        out["n_features_used"] = int(m.group(1))
-    return out
+def metrics_for(repo, config):
+    r = evaluate_fold(2019, 2026, repo=repo)
+    loeo = pd.read_csv(os.path.join(repo, "stage5_ews", "loeo_results.csv"))
+    row = {
+        "config": config,
+        "oos_auc": r["auc"],
+        "oos_auc_pr": r["ap"],
+        "n_pos": r["n_pos"],
+        "loeo_watch": int(loeo["tier"].isin(["watch", "warning", "alert"]).sum()),
+        "loeo_total": len(loeo),
+    }
+    coef_path = os.path.join(repo, "stage5_ews", "enet_coefficients.csv")
+    if os.path.exists(coef_path):
+        coef = pd.read_csv(coef_path)
+        row["n_features_total"] = len(coef)
+        row["n_features_enet_selected"] = int((coef["coefficient"].abs() > 1e-4).sum())
+    return row
 
 
 def main():
-    rows = []
+    rows = [metrics_for(REPO, "all_features")]
 
-    log = run_stage5({}, "baseline_all_features")
-    m = parse_metrics(log)
-    m["config"] = "all_features"
-    rows.append(m)
+    worktree = add_worktree("enet_robustness")
+    try:
+        env = refit_env(AIM4D_CUTOFF=2019, AIM4D_EXCLUDE_COUNTRY=None,
+                        AIM4D_USE_ENET=1)
+        rc = subprocess.call(
+            [sys.executable, os.path.join(worktree, "stage5_ews", "estimate.py")],
+            env=env, cwd=worktree)
+        if rc != 0:
+            raise SystemExit(f"Stage 5 ENET run failed with rc={rc}")
+        rows.append(metrics_for(worktree, "elastic_net_pruned"))
 
-    log = run_stage5({"AIM4D_USE_ENET": "1"}, "elastic_net_pruned")
-    m = parse_metrics(log)
-    m["config"] = "elastic_net_pruned"
-    rows.append(m)
+        coef_src = os.path.join(worktree, "stage5_ews", "enet_coefficients.csv")
+        coef_dst = os.path.join(REPO, "stage5_ews", "enet_coefficients.csv")
+        if os.path.exists(coef_src) and not os.path.exists(coef_dst):
+            pd.read_csv(coef_src).to_csv(coef_dst, index=False)
+    finally:
+        remove_worktree(worktree)
 
     df = pd.DataFrame(rows)
     df.to_csv(OUT, index=False)
@@ -86,7 +73,10 @@ def main():
     print("ELASTIC-NET FEATURE SELECTION ROBUSTNESS")
     print("=" * 70)
     print(df.to_string(index=False))
-    print(f"\nWrote {OUT}")
+    delta = rows[1]["oos_auc"] - rows[0]["oos_auc"]
+    print(f"\nPruning changes strict-2019 OOS AUC by {delta:+.3f} "
+          f"relative to all features")
+    print(f"Wrote {OUT}")
 
 
 if __name__ == "__main__":

@@ -1004,6 +1004,11 @@ def run_ews():
                  sample_weight=time_weights[train_mask])
         report_mask = np.abs(enet.coef_[0]) > 1e-4
         n_selected = report_mask.sum()
+        enet_coef = pd.DataFrame({"feature": all_meta, "coefficient": enet.coef_[0]})
+        enet_coef = enet_coef.reindex(
+            enet_coef["coefficient"].abs().sort_values(ascending=False).index)
+        enet_coef.to_csv(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      "enet_coefficients.csv"), index=False)
         if os.environ.get("AIM4D_USE_ENET") == "1":
             selected_mask = report_mask
             selected_features = [f for f, s in zip(all_meta, selected_mask) if s]

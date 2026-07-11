@@ -1017,7 +1017,7 @@ def run_ews():
             selected_mask = np.ones_like(report_mask, dtype=bool)
             selected_features = list(all_meta)
             print(f"  Using all {len(all_meta)} features (elastic-net would have pruned to "
-                  f"{n_selected}; pruning hurts OOS AUC by ~0.07).")
+                  f"{n_selected}; see robustness/elastic_net_robustness.py).")
 
         X_selected = X_meta_scaled[:, selected_mask] if selected_mask.sum() >= 5 else X_meta_scaled
 

@@ -1,0 +1,3 @@
+config,oos_auc,oos_auc_pr,n_pos,loeo_watch,loeo_total,n_features_total,n_features_enet_selected
+all_features,0.9344520473552731,0.6559771531211651,54,32,46,,
+elastic_net_pruned,0.9317638753122625,0.6023833014922629,54,32,46,212.0,89.0

@@ -1,0 +1,2 @@
+model,n_features,features,auc_roc,auc_pr,n_test,n_pos
+mobilization_only_logit,6,v2cagenmob;v2cademmob;v2caautmob;v2caautmob_detrended;v2cademmob_detrended;v2cagenmob_detrended,0.7160041272944498,0.15118807994386016,736,54

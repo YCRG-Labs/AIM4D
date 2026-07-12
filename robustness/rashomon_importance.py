@@ -91,26 +91,33 @@ def main():
     print(f"\n  best OOS AUC = {best:.3f}; Rashomon set (within {EPS}) = {len(rashomon)}/{len(fitted)} models")
 
     col_idx = {ch: [i for i, f in enumerate(feats) if chan[f] == ch] for ch in channels}
+    seeds = [42, 137, 271, 314, 999]
     rows = []
-    mob_gt_dsp = 0
-    for m, a in rashomon:
-        base = roc_auc_score(yte, m.predict_proba(Xte)[:, 1])
-        imp = {}
-        for ch, idx in col_idx.items():
-            if not idx:
-                continue
-            drops = []
-            for _ in range(N_PERM):
-                Xp = Xte.copy()
-                perm = RNG.permutation(len(Xp))
-                Xp[:, idx] = Xp[perm][:, idx]
-                drops.append(base - roc_auc_score(yte, m.predict_proba(Xp)[:, 1]))
-            imp[ch] = float(np.mean(drops))
-        rows.append(imp)
-        if imp.get("mobilization", 0) > imp.get("digital control", 0):
-            mob_gt_dsp += 1
+    counts = []
+    for seed in seeds:
+        rng = np.random.default_rng(seed)
+        seed_count = 0
+        for mi, (m, a) in enumerate(rashomon):
+            base = roc_auc_score(yte, m.predict_proba(Xte)[:, 1])
+            imp = {"perm_seed": seed, "model": mi}
+            for ch, idx in col_idx.items():
+                if not idx:
+                    continue
+                drops = []
+                for _ in range(N_PERM):
+                    Xp = Xte.copy()
+                    perm = rng.permutation(len(Xp))
+                    Xp[:, idx] = Xp[perm][:, idx]
+                    drops.append(base - roc_auc_score(yte, m.predict_proba(Xp)[:, 1]))
+                imp[ch] = float(np.mean(drops))
+            rows.append(imp)
+            if imp.get("mobilization", 0) > imp.get("digital control", 0):
+                seed_count += 1
+        counts.append(seed_count)
+    mob_gt_dsp = counts[0]
+    print(f"  mobilization > digital per-model count by permutation seed: {counts}")
 
-    imp_df = pd.DataFrame(rows)
+    imp_df = pd.DataFrame(rows).drop(columns=["perm_seed", "model"])
     print("\n  channel permutation importance across the Rashomon set (OOS AUC drop):")
     summary = imp_df.agg(["mean", "min", "max"]).T.sort_values("mean", ascending=False)
     print(summary.to_string(float_format="%.4f"))
@@ -118,7 +125,8 @@ def main():
     print(f"  mobilization importance range [{imp_df['mobilization'].min():.4f}, {imp_df['mobilization'].max():.4f}]; "
           f"digital control range [{imp_df['digital control'].min():.4f}, {imp_df['digital control'].max():.4f}]")
     summary.to_csv(os.path.join(OUTPUT_DIR, "rashomon_importance_results.csv"))
-    imp_df.to_csv(os.path.join(OUTPUT_DIR, "rashomon_importance_per_model.csv"), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join(OUTPUT_DIR, "rashomon_importance_per_model.csv"), index=False)
+    print(f"  count range across seeds: {min(counts)}-{max(counts)} of {len(rashomon)}")
     print(f"\nSaved to robustness/rashomon_importance_results.csv")
 
 

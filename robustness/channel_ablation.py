@@ -68,10 +68,26 @@ def is_factor(col):
     return c.startswith("factor_") or c.startswith("f1_") or "_c22_" in c
 
 
+def is_mob_dem(col):
+    return col.lower().startswith("v2cademmob")
+
+
+def is_mob_aut(col):
+    return col.lower().startswith("v2caautmob")
+
+
+def is_mob_gen(col):
+    c = col.lower()
+    return c.startswith("v2cagenmob") or c.startswith("v2caconmob")
+
+
 BLOCKS = {
     "dsp": is_dsp,
     "mob": is_mob,
     "factor": is_factor,
+    "mobdem": is_mob_dem,
+    "mobaut": is_mob_aut,
+    "mobgen": is_mob_gen,
 }
 
 

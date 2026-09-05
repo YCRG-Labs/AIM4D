@@ -77,20 +77,29 @@ def truncated_data_dir(T):
         shutil.rmtree(dst)
     os.makedirs(dst)
     src = os.path.join(os.path.dirname(OUT), "data")
-    for name in os.listdir(src):
-        if name.startswith(("_trunc_", "__pycache__")):
-            continue
-        sp, dp = os.path.join(src, name), os.path.join(dst, name)
-        if name.endswith(".csv"):
-            try:
-                df = pd.read_csv(sp, low_memory=False)
-            except Exception:
-                os.symlink(sp, dp); continue
-            if "year" in df.columns:
-                df = df[pd.to_numeric(df["year"], errors="coerce") <= T]
-            df.to_csv(dp, index=False)
-        else:
-            os.symlink(sp, dp)
+
+    def walk(s_dir, d_dir):
+        os.makedirs(d_dir, exist_ok=True)
+        for name in os.listdir(s_dir):
+            if name.startswith(("_trunc_", "__pycache__")):
+                continue
+            sp, dp = os.path.join(s_dir, name), os.path.join(d_dir, name)
+            if os.path.isdir(sp):
+                walk(sp, dp)
+            elif name.endswith(".csv"):
+                try:
+                    df = pd.read_csv(sp, low_memory=False)
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"cannot parse {sp} for truncation at {T}; refusing to "
+                        f"symlink an untruncated file into the panel") from exc
+                if "year" in df.columns:
+                    df = df[pd.to_numeric(df["year"], errors="coerce") <= T]
+                df.to_csv(dp, index=False)
+            else:
+                os.symlink(sp, dp)
+
+    walk(src, dst)
     return dst
 
 

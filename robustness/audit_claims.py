@@ -58,7 +58,7 @@ check("C1", "refit CV mean AP", 0.524, round(cv["ap"].mean(), 3), in_tex="0.524"
 b = csv("bootstrap_cis.csv").set_index("metric")
 for cid, metric, rep, lo, hi, tx in [
     ("C2", "auc_roc_oos_2019", 0.939, 0.800, 0.975, "0.939"),
-    ("C2", "auc_pr_oos_2019", 0.592, 0.354, 0.759, "0.592"),
+    ("C2", "auc_pr_oos_2019", 0.591, 0.354, 0.759, "0.591"),
     ("C2", "bss_oos_2019", 0.212, -0.003, 0.329, "0.212"),
     ("C7", "auc_fh_3yr_decline_2pt", 0.767, 0.720, 0.831, "0.77"),
     ("C7", "auc_polity_3yr_decline_3pt", 0.736, 0.689, 0.774, "0.74"),
@@ -170,9 +170,24 @@ check("C17", "perm congruence", 0.06, round(float(sc["factor_perm_congruence_mea
 check("C17", "hmm kappa real", 0.58, round(float(sc["hmm_kappa_real"]), 2), tol=0.01, in_tex="0.58")
 check("C17", "hmm kappa scrambled", -0.01, round(float(sc["hmm_kappa_scrambled"]), 2), tol=0.01)
 
+# The baseline ladder is now scored on the rows common to every model
+# (robustness/baseline_common_rows.py), so the manuscript carries those figures
+# rather than this standalone file's. Both are checked: the standalone against
+# its own output, the common-row version against the table the paper prints.
 mo = csv("mobilization_only_baseline.csv").iloc[0]
-check("C19", "mob-only AUC", 0.716, round(float(mo["auc_roc"]), 3), in_tex="0.716")
-check("C19", "mob-only AUC-PR", 0.151, round(float(mo["auc_pr"]), 3), in_tex="0.151")
+check("C19", "mob-only AUC (standalone)", 0.716, round(float(mo["auc_roc"]), 3))
+check("C19", "mob-only AUC-PR (standalone)", 0.151, round(float(mo["auc_pr"]), 3))
+bc = csv("baseline_common_rows.csv").set_index("model")
+for _m, _roc, _pr in [
+    ("Five-stage framework (AIM4D)", 0.939, 0.591),
+    ("Persistence (3-yr polyarchy decline)", 0.826, 0.324),
+    ("Mobilization-only logit", 0.756, 0.163),
+    ("Elastic net, V-Dem indicators", 0.813, 0.254),
+    ("Gradient boosting, V-Dem indicators", 0.923, 0.639),
+    ("V-Forecast ensemble", 0.891, 0.493),
+]:
+    check("C19b", f"{_m} AUC", _roc, round(float(bc.loc[_m, "auc_roc"]), 3), in_tex=f"{_roc:.3f}")
+    check("C19b", f"{_m} AUC-PR", _pr, round(float(bc.loc[_m, "auc_pr"]), 3), in_tex=f"{_pr:.3f}")
 
 rb = csv("reliability_bins.csv")
 for i, (mpred, obs, n) in enumerate([(0.091, 0.009, 464), (0.183, 0.044, 203), (0.309, 0.500, 40),

@@ -124,9 +124,7 @@ def build_graph_single_edge_type(df, countries_iso3, years, contig_pairs,
         step_dst = [d - offset for d in spatial_dst if offset <= d < offset + N]
         spatial_lag[offset:offset + N] = neighbor_mean(treat_lag, step_src, step_dst, N)
 
-    node_features_aug = torch.cat([
-        node_features, spatial_lag, spatial_lag, spatial_lag,
-    ], dim=-1)
+    node_features_aug = torch.cat([node_features, spatial_lag], dim=-1)
 
     all_src = spatial_src + temporal_src
     all_dst = spatial_dst + temporal_dst
@@ -209,7 +207,8 @@ def run_network_variants():
         print(f"  Training INE-TARNet...")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            model = train_model(x, y, edge_index, mask_train, mask_test, in_dim)
+            model = train_model(x, y, edge_index, mask_train, mask_test, in_dim,
+                            n_edge_types=1)
 
         print(f"  Running ablation test...")
         ablation = network_ablation_test(model, x, y, edge_index, spatial_ei, temporal_ei,

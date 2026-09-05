@@ -263,6 +263,8 @@ def main():
                   f"bias {r['bias']:+.4f}  coverage {cov:.1%}  width {width:.3f}  "
                   f"({len(res)} reps)")
     d = pd.DataFrame(rows)
+    kind = os.environ.get("AIM4D_BOOT_KIND", "country")
+    d.to_csv(os.path.join(OUT, f"spatial_bootstrap_coverage_{kind}.csv"), index=False)
     d.to_csv(os.path.join(OUT, "spatial_bootstrap_coverage.csv"), index=False)
     worst = d["coverage_95"].min()
     print(f"\nworst coverage across designs: {worst:.1%} against a nominal 95%")

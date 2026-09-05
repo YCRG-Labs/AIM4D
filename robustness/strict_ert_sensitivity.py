@@ -123,14 +123,34 @@ def main():
         acc += r
     b["p"] = acc / len(parts)
 
+    def model_ci(df, seed=20260905, n_boot=2000):
+        """Country-clustered percentile bootstrap CI for one model."""
+        rng = np.random.default_rng(seed)
+        y, pp, cc = df["y"].values, df["p"].values, df["country_name"].values
+        uniq = np.unique(cc)
+        idx = {c: np.where(cc == c)[0] for c in uniq}
+        aa, bb = [], []
+        for _ in range(n_boot):
+            draw = rng.choice(uniq, size=len(uniq), replace=True)
+            j = np.concatenate([idx[c] for c in draw])
+            if y[j].sum() < 3 or y[j].sum() == len(j):
+                continue
+            aa.append(roc_auc_score(y[j], pp[j]))
+            bb.append(average_precision_score(y[j], pp[j]))
+        q = lambda v: (round(float(np.percentile(v, 2.5)), 3), round(float(np.percentile(v, 97.5)), 3))
+        return q(aa), q(bb)
+
     rows = []
     for name, df in [("Four polyarchy variables", p4), ("Five-stage framework", b),
                      ("Gradient boosting", parts["gb"]), ("Random forest", parts["rf"]),
                      ("Elastic net", parts["lr"])]:
+        (alo, ahi), (plo, phi) = model_ci(df)
         rows.append({"model": name, "n": len(df), "n_pos": int(df.y.sum()),
                      "base_rate": round(df.y.mean(), 4),
                      "auc_roc": round(roc_auc_score(df.y, df.p), 4),
-                     "auc_pr": round(average_precision_score(df.y, df.p), 4)})
+                     "auc_pr": round(average_precision_score(df.y, df.p), 4),
+                     "auc_roc_lo": alo, "auc_roc_hi": ahi,
+                     "auc_pr_lo": plo, "auc_pr_hi": phi})
         r = rows[-1]
         print(f"  {name:<26} AUC {r['auc_roc']:.3f}  AP {r['auc_pr']:.3f}  "
               f"n={r['n']} pos={r['n_pos']} base={r['base_rate']:.3f}")

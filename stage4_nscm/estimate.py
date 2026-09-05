@@ -402,10 +402,11 @@ def split_val_test(mask_test, node_year):
     return mv, mt
 
 
-def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42, mask_val=None):
+def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42, mask_val=None,
+                n_edge_types=4):
     torch.manual_seed(seed)
     np.random.seed(seed)
-    model = INETARNet(in_dim)
+    model = INETARNet(in_dim, n_edge_types=n_edge_types)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
@@ -467,7 +468,7 @@ def network_ablation_test(model, x, y, edge_index, spatial_ei, temporal_ei,
         mse_temporal = F.mse_loss(y_temporal[mask_test], y[mask_test]).item()
 
         x_no_lag = x.clone()
-        x_no_lag[:, -TREATMENT_DIM * 3:] = 0.0
+        x_no_lag[:, -model.spatial_lag_dim:] = 0.0
         y_no_lag, _, _, _, _ = model(x_no_lag, temporal_ei)
         mse_no_network = F.mse_loss(y_no_lag[mask_test], y[mask_test]).item()
 
@@ -563,8 +564,8 @@ def run_stage4(seed=42, write_outputs=True):
         factor_spillovers = {}
         for fk in range(TREATMENT_DIM):
             x_partial = x.clone()
-            lag_start = x.shape[1] - TREATMENT_DIM * 3
-            for edge_type in range(3):
+            lag_start = x.shape[1] - model.spatial_lag_dim
+            for edge_type in range(model.n_edge_types):
                 col_idx = lag_start + edge_type * TREATMENT_DIM + fk
                 if col_idx < x_partial.shape[1]:
                     x_partial[:, col_idx] = 0.0

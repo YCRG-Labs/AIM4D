@@ -1,7 +1,7 @@
-model,n,n_pos,base_rate,auc_roc,auc_pr,ap_lift,prec_top10,prec_top25,prec_top_decile
-Persistence (3-yr polyarchy decline),933,107,0.1147,0.5912,0.2102,1.83,0.5,0.32,0.28
-Four polyarchy variables,933,107,0.1147,0.7178,0.2263,1.97,0.3,0.32,0.269
-"Elastic net, all features",933,107,0.1147,0.6544,0.1937,1.69,0.4,0.16,0.194
-"Gradient boosting, all features",933,107,0.1147,0.6739,0.2197,1.92,0.6,0.32,0.194
-Random-forest ensemble,933,107,0.1147,0.7152,0.2048,1.79,0.1,0.16,0.226
-"Five-stage framework, rank-mean blend",933,107,0.1147,0.6804,0.2028,1.77,0.3,0.2,0.204
+model,n,n_pos,base_rate,auc_roc,auc_pr,ap_lift,prec_top10,prec_top25,prec_top_decile,auc_roc_lo,auc_roc_hi,auc_pr_lo,auc_pr_hi
+Persistence (3-yr polyarchy decline),933,107,0.1147,0.5912,0.2102,1.83,0.5,0.32,0.28,0.485,0.694,0.12,0.356
+Four polyarchy variables,933,107,0.1147,0.7178,0.2263,1.97,0.3,0.32,0.269,0.61,0.819,0.13,0.384
+"Elastic net, all features",933,107,0.1147,0.6544,0.1937,1.69,0.4,0.16,0.194,0.545,0.748,0.114,0.32
+"Gradient boosting, all features",933,107,0.1147,0.6739,0.2197,1.92,0.6,0.32,0.194,0.571,0.764,0.126,0.363
+Random-forest ensemble,933,107,0.1147,0.7152,0.2048,1.79,0.1,0.16,0.226,0.62,0.805,0.129,0.325
+"Five-stage framework, rank-mean blend",933,107,0.1147,0.6804,0.2028,1.77,0.3,0.2,0.204,0.57,0.775,0.119,0.331

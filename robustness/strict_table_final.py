@@ -90,6 +90,22 @@ def metrics(df):
             "prec_top_decile": round(prec_at(y, p, max(1, len(y) // 10)), 3)}
 
 
+def model_ci(y, p, countries):
+    """Country-clustered percentile bootstrap CI for one model's AUC and AP."""
+    uniq = np.unique(countries)
+    idx = {c: np.where(countries == c)[0] for c in uniq}
+    a, b = [], []
+    for _ in range(N_BOOT):
+        draw = RNG.choice(uniq, size=len(uniq), replace=True)
+        j = np.concatenate([idx[c] for c in draw])
+        if y[j].sum() < 3 or y[j].sum() == len(j):
+            continue
+        a.append(roc_auc_score(y[j], p[j]))
+        b.append(average_precision_score(y[j], p[j]))
+    q = lambda v: (round(float(np.percentile(v, 2.5)), 3), round(float(np.percentile(v, 97.5)), 3))
+    return q(a), q(b)
+
+
 def paired_ci(y, pa, pb, countries):
     uniq = np.unique(countries); idx = {c: np.where(countries == c)[0] for c in uniq}
     da, dp = [], []
@@ -160,7 +176,10 @@ def main():
         v = v[[tuple(x) in common for x in v[["country_name", "year"]].values]]
         v = v.sort_values(["country_name", "year"]).reset_index(drop=True)
         aligned[name] = v
-        rows.append({"model": name, **metrics(v)})
+        (alo, ahi), (plo, phi) = model_ci(v.y.values, v.p.values, v.country_name.values)
+        rows.append({"model": name, **metrics(v),
+                     "auc_roc_lo": alo, "auc_roc_hi": ahi,
+                     "auc_pr_lo": plo, "auc_pr_hi": phi})
         r = rows[-1]
         print(f"{name:<40} AUC {r['auc_roc']:.3f}  AP {r['auc_pr']:.3f} "
               f"({r['ap_lift']}x)  p@10 {r['prec_top10']}  p@25 {r['prec_top25']}")
@@ -171,6 +190,8 @@ def main():
                                            fw.country_name.values)
     print(f"\nframework minus four variables: dAUC {ma:+.3f} [{la:+.3f}, {ha:+.3f}]   "
           f"dAP {mp:+.3f} [{lp:+.3f}, {hp:+.3f}]")
+    allp = pd.concat([v.assign(model=k) for k, v in aligned.items()], ignore_index=True)
+    allp.to_csv(os.path.join(OUT, f"strict_table_predictions_h{H}.csv"), index=False)
     pd.DataFrame(rows).to_csv(os.path.join(OUT, f"strict_table_final_h{H}.csv"), index=False)
     print(f"\nWrote strict_table_final_h{H}.csv")
 

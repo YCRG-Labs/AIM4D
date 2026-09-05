@@ -144,13 +144,34 @@ def fit_all(y, Xe, WX, Wop, groups, want_boot=False):
                    "se_theta": sed[k0:k0 + WX.shape[1]].copy(),
                    "beta": bd[:k0].copy(), "V": Vd, "k0": k0}
 
-    # SAR by 2SLS, then SAC by generalised spatial 2SLS
+    # SAR by 2SLS, then SAC by generalised spatial 2SLS.
+    # Two instrument sets. The Kelejian-Prucha set is the spatial lags of the
+    # exogenous covariates. Lee's best-2SLS instrument is the reduced-form
+    # prediction W(I - rho W)^-1 X beta, built from a preliminary estimate; it is
+    # the strongest instrument available for this model, so the first-stage F it
+    # attains is the ceiling any instrument choice can reach here.
     Wy = Wop(y)
     inst = np.column_stack([np.column_stack([Wop(WX[:, k]) for k in range(WX.shape[1])]),
                             np.column_stack([Wop(Wop(WX[:, k])) for k in range(WX.shape[1])])])
+    bs0, _, _, _ = tsls(y, Wy[:, None], Xe, inst, groups)
+    rho0 = float(np.clip(bs0[0], -0.9, 0.9))
+    b0, _ = ols(y - rho0 * Wy, Xe)
+    xb = Xe @ b0
+    lee = xb.copy()                      # Neumann expansion of (I - rho W)^-1 X beta
+    term = xb.copy()
+    for _ in range(6):
+        term = rho0 * Wop(term)
+        lee = lee + term
+    lee = Wop(lee)[:, None]
+    out["best_iv"] = {"F_kp": first_stage_F(Wy, Xe, inst, groups),
+                      "F_lee": first_stage_F(Wy, Xe, lee, groups),
+                      "rf_R2": 1.0 - np.var(y - xb) / np.var(y)}
     bs, ses, us, _ = tsls(y, Wy[:, None], Xe, inst, groups)
     out["SAR"] = {"rho": float(bs[0]), "se_rho": float(ses[0]),
-                  "F": first_stage_F(Wy, Xe, inst, groups)}
+                  "F": out["best_iv"]["F_kp"]}
+    bl, sel, ul, _ = tsls(y, Wy[:, None], Xe, lee, groups)
+    out["SAR_lee"] = {"rho": float(bl[0]), "se_rho": float(sel[0]),
+                      "F": out["best_iv"]["F_lee"]}
     lam_s = gm_lambda(us, Wop, trW, Wop.n)
     yf, Xf, instf = filtered(lam_s, [y, Xe, inst])
     Wyf = Wop(y) - lam_s * Wop(Wop(y))
@@ -199,7 +220,8 @@ def main():
     rng = np.random.default_rng(20260905)
     uniq = np.unique(cid)
     idx = {c: np.where(cid == c)[0] for c in uniq}
-    boots = {k: [] for k in ["SEM.lambda", "SDEM.lambda", "SAR.rho", "SAC.rho", "SAC.lambda"]}
+    boots = {k: [] for k in ["SEM.lambda", "SDEM.lambda", "SAR.rho", "SARlee.rho",
+                             "SAC.rho", "SAC.lambda"]}
     theta_boot = []
     for _ in range(N_BOOT):
         draw = rng.choice(uniq, len(uniq), replace=True)
@@ -213,6 +235,7 @@ def main():
         boots["SEM.lambda"].append(r["SEM"]["lambda"])
         boots["SDEM.lambda"].append(r["SDEM"]["lambda"])
         boots["SAR.rho"].append(r["SAR"]["rho"])
+        boots["SARlee.rho"].append(r["SAR_lee"]["rho"])
         boots["SAC.rho"].append(r["SAC"]["rho"])
         boots["SAC.lambda"].append(r["SAC"]["lambda"])
         theta_boot.append(r["SDEM"]["theta"])
@@ -227,12 +250,12 @@ def main():
         lo, hi = ci(boots[f"{key}.lambda"])
         res.append({"model": key, "param": "lambda", "est": round(val, 4),
                     "ci_low": round(lo, 4), "ci_high": round(hi, 4)})
-    for key in ("SAR", "SAC"):
-        lo, hi = ci(boots[f"{key}.rho"])
+    for key, bkey, note in (("SAR", "SAR.rho", f"Kelejian-Prucha lags, F {base['SAR']['F']:.1f}"),
+                            ("SAR_lee", "SARlee.rho", f"Lee best instrument, F {base['SAR_lee']['F']:.1f}"),
+                            ("SAC", "SAC.rho", "generalised spatial 2SLS")):
+        lo, hi = ci(boots[bkey])
         res.append({"model": key, "param": "rho", "est": round(base[key]["rho"], 4),
-                    "ci_low": round(lo, 4), "ci_high": round(hi, 4),
-                    "note": (f"cluster-robust first-stage F {base['SAR']['F']:.1f}"
-                             if key == "SAR" else "generalised spatial 2SLS")})
+                    "ci_low": round(lo, 4), "ci_high": round(hi, 4), "note": note})
     tb = np.array(theta_boot)
     for k, c in enumerate(Xcols):
         lo, hi = np.percentile(tb[:, k], [2.5, 97.5])
@@ -245,6 +268,15 @@ def main():
     beta_b = np.array([base["SDEM"]["beta"][1]] * len(tb))
     cf = tb[:, 0] + rho_b[:len(tb)] * beta_b
     lo, hi = np.percentile(cf, [2.5, 97.5])
+    res.append({"model": "instrument strength", "param": "first-stage F, Kelejian-Prucha lags",
+                "est": round(base["best_iv"]["F_kp"], 2), "ci_low": np.nan, "ci_high": np.nan,
+                "note": "cluster-robust"})
+    res.append({"model": "instrument strength", "param": "first-stage F, Lee best instrument",
+                "est": round(base["best_iv"]["F_lee"], 2), "ci_low": np.nan, "ci_high": np.nan,
+                "note": "strongest available instrument for this model"})
+    res.append({"model": "instrument strength", "param": "reduced-form R2 of the outcome on X",
+                "est": round(float(base["best_iv"]["rf_R2"]), 4), "ci_low": np.nan, "ci_high": np.nan,
+                "note": "bounds how strong any instrument built from X can be"})
     res.append({"model": "common factor", "param": "theta + rho*beta (lagged factor)",
                 "est": round(float(np.mean(cf)), 4), "ci_low": round(float(lo), 4),
                 "ci_high": round(float(hi), 4),

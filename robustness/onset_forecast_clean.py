@@ -41,7 +41,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 OUT = os.path.dirname(os.path.abspath(__file__))
 HORIZONS = [2, 5]
-ORIGINS = list(range(2005, 2026))
+LAST_OBS = 2025
+# An origin is admissible only when its whole outcome window falls inside the
+# observed panel. With onsets observed through 2025 a later origin would score
+# rows against onsets that cannot yet have been recorded, counting them as
+# non-events. Origins are therefore horizon-specific.
+ORIGINS = list(range(2005, LAST_OBS + 1))
+
+
+def origins_for(h):
+    return [t for t in ORIGINS if t <= LAST_OBS - h]
 N_BOOT = 2000
 SEEDS = [0, 1, 2]
 RNG = np.random.default_rng(20260904)
@@ -114,7 +123,7 @@ def learner(name, seed):
 
 def rolling_scores(d, feats, h, name, seed):
     y_all, p_all, c_all, yr_all = [], [], [], []
-    for T in ORIGINS:
+    for T in origins_for(h):
         tr = d[(d.year <= T - h) & d.at_risk]
         te = d[(d.year == T) & d.at_risk]
         if len(te) == 0 or tr[f"y{h}"].sum() < 5:

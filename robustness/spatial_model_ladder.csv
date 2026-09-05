@@ -1,0 +1,8 @@
+model,param,estimate,se,note,first_stage_F
+"SLX (neighbours' outcomes as covariates, no feedback)",theta_cultural,0.4407,0.0866,,
+"SLX (neighbours' outcomes as covariates, no feedback)",theta_contiguity,0.1068,0.0555,,
+SLX residual diagnostic,Moran's I on residuals,-0.0489,0.0,permutation p in the se column; near zero means neighbours' covariates absorb the clustering,
+"SAR (spatial 2SLS, contiguity)",rho,0.6657,0.2009,,53.5
+SAR impact decomposition,spatial multiplier,2.9913,,total effect of a unit own-shock including feedback,
+SAR impact decomposition,indirect share,0.6657,,share of the total effect running through neighbours,
+SAR residual diagnostic,Moran's I on residuals,-0.28,0.0,permutation p in the se column,

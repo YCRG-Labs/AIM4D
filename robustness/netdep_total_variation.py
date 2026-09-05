@@ -59,6 +59,34 @@ def recover():
     return m, Pf, Pl
 
 
+
+def check_seed_evidence(out):
+    """Refuse to present a country ranking from one fit.
+
+    This measure has reversed its ordering of the usual cases three times, once
+    per defensible change to the statistic, the comparator, or the seed. A single
+    run cannot distinguish a finding from an initialization, so the ranking is
+    withheld unless the seed sweep exists, and the seed distribution is what the
+    paper reports either way.
+    """
+    sweep = os.path.join(OUT, "netdep_tv_seed_sweep.csv")
+    if not os.path.exists(sweep):
+        print("\n*** no seed sweep on disk: single-fit country ordering NOT reported.")
+        print("    run netdep_tv_seed_sweep.py before quoting any ranking from this file.")
+        return False
+    sw = pd.read_csv(sweep)
+    n = sw["seed"].nunique()
+    if n < 10:
+        print(f"\n*** seed sweep has only {n} seeds: ordering not reported (need 10).")
+        return False
+    g = sw.groupby("country")["tv"].mean().sort_values(ascending=False)
+    print(f"\nSeed-mean ordering over {n} seeds, which is what the paper reports:")
+    for c, v in g.head(5).items():
+        share = (sw[sw.country == c]["signed"] > 0).mean()
+        print(f"    {str(c)[:26]:<28} tv {v:.3f}   positive in {share:.0%} of seeds")
+    return True
+
+
 def main():
     m, Pf, Pl = recover()
     tv = 0.5 * np.abs(Pf - Pl).sum(axis=1)
@@ -94,6 +122,7 @@ def main():
         print(f"  {str(r.country_name):<24}{r.netdep_tv:>8.3f}{r.netdep_signed:>+10.3f}"
               f"{r.contagion_score:>11.3f}")
 
+    check_seed_evidence(out)
     out.to_csv(os.path.join(OUT, "netdep_total_variation.csv"), index=False)
     print("\nWrote netdep_total_variation.csv")
 

@@ -165,7 +165,10 @@ def fit_all(y, Xe, WX, Wop, groups, want_boot=False):
     lee = Wop(lee)[:, None]
     out["best_iv"] = {"F_kp": first_stage_F(Wy, Xe, inst, groups),
                       "F_lee": first_stage_F(Wy, Xe, lee, groups),
-                      "rf_R2": 1.0 - np.var(y - xb) / np.var(y)}
+                      # Fit of y on X after removing rho0*Wy. This is NOT the spatial reduced-form
+            # mean, which carries the multiplier (I - rho W)^-1; it is reported as a
+            # descriptive statistic only.
+            "rf_R2": 1.0 - np.var(y - rho0 * Wy - xb) / np.var(y)}
     bs, ses, us, _ = tsls(y, Wy[:, None], Xe, inst, groups)
     out["SAR"] = {"rho": float(bs[0]), "se_rho": float(ses[0]),
                   "F": out["best_iv"]["F_kp"]}
@@ -229,7 +232,13 @@ def main():
         cb, yb = cid[j], yr[j]
         try:
             Wb = YearBlockW(cb, yb, W, countries)
-            r = fit_all(y[j], Xe[j], WX[j], Wb, cb)
+            # Every spatial term must come from the draw's own network. Passing the
+            # cached WX would mix the draw's weights for the outcome and residual
+            # lags with the full sample's weights for the contextual covariates:
+            # on a three-country chain with a draw that drops the middle country,
+            # the cached lag is [2,2,2] where the draw's own is [0,0,0].
+            WXb = np.column_stack([Wb(p[c].values[j]) for c in Xcols])
+            r = fit_all(y[j], Xe[j], WXb, Wb, cb)
         except Exception:
             continue
         boots["SEM.lambda"].append(r["SEM"]["lambda"])
@@ -263,24 +272,20 @@ def main():
                     "est": round(float(base["SDEM"]["theta"][k]), 4),
                     "ci_low": round(float(lo), 4), "ci_high": round(float(hi), 4)})
 
-    # common-factor restriction: theta + rho*beta = 0, tested on the bootstrap
-    rho_b = np.array(boots["SAC.rho"])
-    beta_b = np.array([base["SDEM"]["beta"][1]] * len(tb))
-    cf = tb[:, 0] + rho_b[:len(tb)] * beta_b
-    lo, hi = np.percentile(cf, [2.5, 97.5])
-    res.append({"model": "instrument strength", "param": "first-stage F, Kelejian-Prucha lags",
-                "est": round(base["best_iv"]["F_kp"], 2), "ci_low": np.nan, "ci_high": np.nan,
-                "note": "cluster-robust"})
-    res.append({"model": "instrument strength", "param": "first-stage F, Lee best instrument",
-                "est": round(base["best_iv"]["F_lee"], 2), "ci_low": np.nan, "ci_high": np.nan,
-                "note": "strongest available instrument for this model"})
-    res.append({"model": "instrument strength", "param": "reduced-form R2 of the outcome on X",
-                "est": round(float(base["best_iv"]["rf_R2"]), 4), "ci_low": np.nan, "ci_high": np.nan,
-                "note": "bounds how strong any instrument built from X can be"})
-    res.append({"model": "common factor", "param": "theta + rho*beta (lagged factor)",
-                "est": round(float(np.mean(cf)), 4), "ci_low": round(float(lo), 4),
-                "ci_high": round(float(hi), 4),
-                "note": "zero is the Durbin common-factor restriction"})
+    for lbl, key, note in (
+            ("first-stage F, Kelejian-Prucha lags", "F_kp", "cluster-robust"),
+            ("first-stage F, Lee best instrument", "F_lee", "strongest instrument available here"),
+            ("fit of the outcome on X (not the spatial reduced form)", "rf_R2",
+             "descriptive only; does not by itself establish an identification limit")):
+        res.append({"model": "instrument strength", "param": lbl,
+                    "est": round(float(base["best_iv"][key]), 4),
+                    "ci_low": np.nan, "ci_high": np.nan, "note": note})
+
+    # The common-factor restriction is not reported. Testing theta + rho*beta = 0
+    # requires theta, rho and beta from one encompassing specification with their
+    # joint uncertainty; taking theta from the Durbin-error bootstrap, rho from the
+    # combined-model bootstrap and beta fixed at its full-sample value is not that
+    # test, and the version this script previously printed has been removed.
 
     out = pd.DataFrame(res)
     print(out.to_string(index=False))

@@ -314,9 +314,18 @@ def compute_election_vulnerability():
             has_election = np.maximum(has_election, vdem[et].fillna(0).values)
     vdem["has_election"] = has_election
 
+    # A centered window lets year t see an election at t+1. V-Dem records elections
+    # that occurred, not calendars that were published, so that is knowledge of an
+    # outcome partly determined by the process being forecast: cancelled, postponed
+    # and snap elections are exactly the politically informative cases. The backward
+    # window is the default and matches the sibling column built at G5 below.
+    _elec_mode = os.environ.get("AIM4D_ELECTION_WINDOW", "backward")
+    _centered = _elec_mode == "centered"
     vdem["election_within_2yr"] = vdem.groupby("country_text_id")["has_election"].transform(
-        lambda x: x.rolling(3, min_periods=1, center=True).max()
+        lambda x: x.rolling(3, min_periods=1, center=_centered).max()
     ).fillna(0)
+    if _centered:
+        print("  WARNING: election window is CENTERED and reads year t+1 (AIM4D_ELECTION_WINDOW=centered)")
 
     if "v2xpas_democracy_opposition" in vdem.columns:
         vdem["opp_antidem"] = vdem.groupby("country_text_id")["v2xpas_democracy_opposition"].transform(

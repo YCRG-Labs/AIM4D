@@ -1,32 +1,35 @@
 """
-Diffusion measured the way the spatial-econometrics literature measures it.
+Diffusion: what the spatial-econometrics ladder would require, and what this
+script does not yet deliver.
 
-The network-dependence index built on the Stage 4 graph is a bespoke quantity.
-It has reversed its ordering of the usual cases three times under changes that
-were all defensible: a different statistic, a different comparator, a different
-seed. That is a symptom of an estimand without an agreed definition, not of a
-finding that keeps being revised.
+WITHDRAWN. An earlier version of this script reported a comparison between an
+"SLX" and a "SAR" specification and drew a substantive conclusion from their
+residual diagnostics. That conclusion is withdrawn. Three defects made it
+invalid, and they are recorded here rather than removed so the error is legible:
 
-This estimates the quantity the field does agree on. Following the taxonomy in
-Franzese and Hays (2007) and the specification guidance in Cook, Hays and
-Franzese, we fit the ladder of spatial models and report the autoregressive
-parameter with its impact decomposition:
+  1. The model labelled SLX regressed the outcome change on neighbours' outcome
+     changes, W*dy, not on spatially lagged explanatory variables, W*X. Those are
+     spatial lags of the outcome and are simultaneously determined, so the
+     specification was a spatial-autoregressive model under a different name and
+     could not contrast contextual effects with outcome transmission.
+  2. The instrument set included the spatial lag of a same-year leave-one-out
+     mean of the outcome. A neighbour's leave-one-out mean contains the receiving
+     country's own outcome, so the instrument was contaminated by the regressand.
+     A large first-stage F says nothing about exogeneity.
+  3. Choosing the specification whose residual Moran's I lies closer to zero is
+     not a valid selection rule among contextual, autoregressive and error
+     specifications, and Cook, Hays and Franzese caution specifically against
+     using general residual tests this way. The SDEM and SAC models that would
+     discriminate among these were never estimated.
 
-    SLX   dy = X b + WX th + e            neighbours' covariates, no feedback
-    SAR   dy = rho W dy + X b + e         feedback through neighbours' outcomes
-    SEM   dy = X b + u, u = lam W u + e   clustering in unobservables only
-    SDEM  dy = X b + WX th + u, u = lam W u + e
-    SAC   dy = rho W dy + X b + u, u = lam W u + e
+The permutation reference for Moran's I was also wrong, holding the observed
+spatial lag fixed while permuting the residuals; it is corrected below and the
+corrected diagnostic is reported for description only.
 
-The last two are the specifications Cook, Hays and Franzese recommend when the
-question is whether an apparent spillover is transmission or common exposure,
-which is exactly the objection this paper cannot otherwise answer. SAR and SAC
-are fit by spatial two-stage least squares, instrumenting W dy with WX and W^2 X
-as those authors prescribe, because OLS on a spatial lag is simultaneity-biased.
-
-Every estimate here is deterministic given the data. There is no seed.
-
-Outputs robustness/spatial_model_ladder.csv.
+What remains here is a descriptive spatial-lag fit with its simultaneity
+acknowledged. It supports no verdict about transmission versus common exposure.
+Doing that properly requires W*X constructed from exogenous covariates,
+instruments that exclude the outcome, and estimation of SDEM and SAC.
 """
 
 import os
@@ -98,26 +101,25 @@ def wlag_residual(resid, p, W, countries):
     return out
 
 
-def morans_I(resid, wr, W, p, countries):
-    """Moran's I on residuals, the diagnostic Cook, Hays and Franzese recommend.
+def morans_I(resid, p, W, countries, n_perm=999, seed=0):
+    """Moran's I on residuals with a correctly permuted reference distribution.
 
-    A moment estimator of the error-autocorrelation parameter can leave the
-    stationary range when the model is misspecified, which is uninformative.
-    Moran's I is bounded and its sign and magnitude are interpretable directly.
+    Under the permutation null the spatial lag must be recomputed from the
+    permuted values. Holding the observed lag fixed while shuffling the residuals
+    produces a null that is too narrow and p-values that are anti-conservative.
     """
-    n = len(resid)
     z = resid - resid.mean()
-    wz = wr - wr.mean()
-    num = n * (z @ wz)
-    den = (np.abs(W).sum()) * (z @ z) / max(len(countries), 1) * n / max(n, 1)
-    I = float((z @ wz) / (z @ z)) if (z @ z) > 0 else np.nan
-    # permutation reference distribution
-    rng = np.random.default_rng(0)
-    null = []
-    for _ in range(200):
+    wz = wlag_residual(z, p, W, countries)
+    denom = z @ z
+    if denom <= 0:
+        return np.nan, np.nan
+    I = float((z @ wz) / denom)
+    rng = np.random.default_rng(seed)
+    null = np.empty(n_perm)
+    for b in range(n_perm):
         zp = rng.permutation(z)
-        null.append((zp @ wz) / (zp @ zp))
-    null = np.array(null)
+        wzp = wlag_residual(zp, p, W, countries)
+        null[b] = (zp @ wzp) / (zp @ zp)
     pval = float((np.abs(null) >= abs(I)).mean())
     return I, pval
 
@@ -148,8 +150,7 @@ def main():
                  "param": "theta_cultural", "estimate": round(b[k], 4), "se": round(se[k], 4)})
     rows.append({"model": "SLX (neighbours' outcomes as covariates, no feedback)",
                  "param": "theta_contiguity", "estimate": round(b[k + 1], 4), "se": round(se[k + 1], 4)})
-    wr = wlag_residual(r, p, Wg, countries)
-    I_slx, pI_slx = morans_I(r, wr, Wg, p, countries)
+    I_slx, pI_slx = morans_I(r, p, Wg, countries)
     rows.append({"model": "SLX residual diagnostic", "param": "Moran's I on residuals",
                  "estimate": round(I_slx, 4), "se": round(pI_slx, 3),
                  "note": "permutation p in the se column; near zero means neighbours' covariates absorb the clustering"})
@@ -179,8 +180,7 @@ def main():
                      "estimate": round(1 - 1 / total_mult, 4),
                      "note": "share of the total effect running through neighbours"})
 
-    wr2 = wlag_residual(r2, p, Wg, countries)
-    I_sar, pI_sar = morans_I(r2, wr2, Wg, p, countries)
+    I_sar, pI_sar = morans_I(r2, p, Wg, countries)
     rows.append({"model": "SAR residual diagnostic", "param": "Moran's I on residuals",
                  "estimate": round(I_sar, 4), "se": round(pI_sar, 3),
                  "note": "permutation p in the se column"})

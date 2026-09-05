@@ -79,6 +79,18 @@ def check_seed_evidence(out):
     if n < 10:
         print(f"\n*** seed sweep has only {n} seeds: ordering not reported (need 10).")
         return False
+    # A seed count is not a protocol check. The sweep must have been produced by
+    # the same selection rule as the canonical fit, or its spread confounds
+    # initialization with protocol; and the sweep must be newer than the residual
+    # file it is meant to describe.
+    sweep_src = os.path.join(OUT, "netdep_tv_seed_sweep.py")
+    if os.path.exists(sweep_src) and "split_val_test" not in open(sweep_src).read():
+        print("\n*** seed sweep does not use the canonical validation split: ordering not reported.")
+        return False
+    resid = os.path.join(OUT, "..", "stage4_nscm", "nscm_residuals.csv")
+    if os.path.exists(resid) and os.path.getmtime(sweep) < os.path.getmtime(resid):
+        print("\n*** seed sweep predates the current Stage 4 fit: ordering not reported.")
+        return False
     g = sw.groupby("country")["tv"].mean().sort_values(ascending=False)
     print(f"\nSeed-mean ordering over {n} seeds, which is what the paper reports:")
     for c, v in g.head(5).items():

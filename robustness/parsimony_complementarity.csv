@@ -1,0 +1,7 @@
+model,auc_roc,auc_pr,prec_top5,prec_top10,n,n_pos
+simple (4 polyarchy vars),0.719,0.2141,0.2588,0.2353,1136,116
+pipeline (engineered),0.699,0.1805,0.2471,0.2118,1136,116
+combined (simple + pipeline),0.7116,0.1892,0.2118,0.2059,1136,116
+blend (rank-avg),0.7446,0.2224,0.2588,0.2059,1136,116
+delta: combined (simple + pipeline) minus simple,-0.0081,-0.0262,,,1136,116
+delta: blend (rank-avg) minus simple,0.0253,0.0078,,,1136,116

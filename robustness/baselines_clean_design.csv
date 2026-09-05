@@ -1,0 +1,6 @@
+model,auc_roc,auc_pr,ap_lift,n,n_pos,base_rate
+Persistence (3yr polyarchy decline),0.6004,0.1777,1.82,1424,139,0.0976
+PITF-style logit (parsimonious),0.719,0.2141,2.1,1136,116,0.1021
+Elastic net (all features),0.6419,0.1672,1.64,1136,116,0.1021
+Gradient boosting (all features),0.6225,0.1755,1.72,1136,116,0.1021
+Random forest (V-Forecast-style ensemble),0.7112,0.1908,1.87,1136,116,0.1021

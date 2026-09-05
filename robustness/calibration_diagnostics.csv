@@ -1,0 +1,8 @@
+quantity,estimate,ci_low,ci_high,ideal,n_boot
+calibration slope,3.404,2.4525,5.2638,1.0,2000
+calibration intercept,2.2575,1.0501,4.0428,0.0,2000
+"equal-frequency bin (0.0254, 0.0762]",0.0563,0.0,,,148
+"equal-frequency bin (0.0762, 0.105]",0.0902,0.0,,,147
+"equal-frequency bin (0.105, 0.137]",0.1204,0.0204,,,147
+"equal-frequency bin (0.137, 0.187]",0.1616,0.0272,,,147
+"equal-frequency bin (0.187, 0.608]",0.2852,0.3197,,,147

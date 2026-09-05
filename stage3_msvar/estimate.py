@@ -515,11 +515,15 @@ def lasso_select(state_df, macro, covariate_cols):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        lasso = LogisticRegressionCV(
+        lasso_kwargs = dict(
             penalty="l1", solver="saga", cv=5, Cs=20,
-            multi_class="multinomial", max_iter=5000, random_state=42,
+            max_iter=5000, random_state=42,
             n_jobs=int(os.environ.get("AIM4D_THREADS", "4")),
         )
+        try:
+            lasso = LogisticRegressionCV(multi_class="multinomial", **lasso_kwargs)
+        except TypeError:
+            lasso = LogisticRegressionCV(**lasso_kwargs)
         lasso.fit(X, y)
 
     coef_norms = np.abs(lasso.coef_).sum(axis=0)

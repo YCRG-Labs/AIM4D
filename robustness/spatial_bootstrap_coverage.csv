@@ -1,0 +1,10 @@
+design,lambda_true,n_rep,mean_estimate,bias,coverage_95,mean_width
+balanced,0.0,150,0.006,0.006,0.927,0.4466
+balanced,0.3,150,0.301,0.001,0.92,0.4171
+balanced,0.6,150,0.594,-0.006,0.947,0.3442
+unbalanced 15% missing,0.0,150,-0.0146,-0.0146,0.907,0.4359
+unbalanced 15% missing,0.3,150,0.282,-0.018,0.92,0.4087
+unbalanced 15% missing,0.6,150,0.5803,-0.0197,0.933,0.3367
+unbalanced 30% missing,0.0,150,0.0008,0.0008,0.907,0.4222
+unbalanced 30% missing,0.3,150,0.2956,-0.0044,0.893,0.3934
+unbalanced 30% missing,0.6,150,0.5904,-0.0096,0.9,0.3207

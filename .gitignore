@@ -19,3 +19,9 @@ robustness/_cache_strat_*
 robustness/_seqshape_*
 robustness/audit_mtl_election_leak.py
 robustness/*.log
+
+# Per-origin truncated panels built by strict_endtoend_refit.py. These are
+# ~450MB copies of data/ and are deleted when each origin finishes; a glob add
+# during a run would otherwise commit one.
+data/_trunc_*/
+.refit_worktrees/

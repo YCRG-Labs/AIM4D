@@ -1,6 +1,6 @@
 model,depth,mean_annual_precision,onsets_detected,onsets_total,detection_rate,median_lead_yrs,alerts_issued,alerts_per_onset_detected
-Five-stage framework,5,0.154,3,28,0.107,3.0,65,21.7
-Five-stage framework,10,0.208,13,28,0.464,3.0,130,10.0
+Five-stage framework,5,0.2,5,28,0.179,3.0,65,13.0
+Five-stage framework,10,0.262,13,28,0.464,3.0,130,10.0
 Five-stage framework,20,0.196,16,28,0.571,3.0,260,16.2
 Four polyarchy variables,5,0.292,8,28,0.286,3.0,65,8.1
 Four polyarchy variables,10,0.246,12,28,0.429,3.0,130,10.8

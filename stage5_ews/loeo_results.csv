@@ -1,47 +1,47 @@
 country,max_risk,tier,detected,type,detected_watch,detected_warning,detected_alert
-Hungary,0.053292904214257,none,False,backsliding,0,0,0
-Türkiye,0.17933042138578492,alert,True,backsliding,1,1,1
-Poland,0.029056644860176884,none,False,backsliding,0,0,0
-Venezuela,0.07380016231610981,watch,True,backsliding,1,0,0
-Tunisia,0.177325797562427,alert,True,backsliding,1,1,1
-Burma/Myanmar,0.20057829764420945,alert,True,coup,1,1,1
-Mali,0.11072357759554788,warning,True,coup,1,1,0
-Burkina Faso,0.07779280662645095,watch,True,coup,1,0,0
-Nicaragua,0.022007613555676212,none,False,backsliding,0,0,0
-Philippines,0.045105368660802656,none,False,backsliding,0,0,0
-India,0.15744077565543263,alert,True,backsliding,1,1,1
-Brazil,0.27588733230092816,alert,True,backsliding,1,1,1
-Serbia,0.02786713669287663,none,False,backsliding,0,0,0
-Bangladesh,0.28841748715748783,alert,True,backsliding,1,1,1
-Thailand,0.2040932625785174,alert,True,coup,1,1,1
-Egypt,0.260961322059661,alert,True,coup,1,1,1
-Fiji,0.047284142615401877,none,False,coup,0,0,0
-Niger,0.10742582197072797,warning,True,coup,1,1,0
-Guinea,0.038160797351438284,none,False,coup,0,0,0
-Guinea-Bissau,0.051535389052231956,none,False,coup,0,0,0
-Afghanistan,0.05148855122661168,none,False,coup,0,0,0
-Sudan,0.0433988395876978,none,False,coup,0,0,0
-Chad,0.18889674687798436,alert,True,coup,1,1,1
-Ukraine,0.041231751426574884,none,False,backsliding,0,0,0
-Maldives,0.16136328546864592,alert,True,backsliding,1,1,1
-Zambia,0.11035156904745333,warning,True,backsliding,1,1,0
-North Macedonia,0.05072808266480659,none,False,backsliding,0,0,0
-Kenya,0.05740542091895164,watch,True,backsliding,1,0,0
-Bolivia,0.08858802911320886,watch,True,backsliding,1,0,0
-Benin,0.08722179340041986,watch,True,backsliding,1,0,0
-Ivory Coast,0.12239732456712563,warning,True,backsliding,1,1,0
-Nigeria,0.14006410443668257,alert,True,backsliding,1,1,1
-Guyana,0.12965549095951584,warning,True,backsliding,1,1,0
-Mauritius,0.10962199975651893,warning,True,backsliding,1,1,0
-Georgia,0.04342603227415069,none,False,backsliding,0,0,0
-Greece,0.11312096543804791,warning,True,backsliding,1,1,0
-Botswana,0.07466914893182366,watch,True,backsliding,1,0,0
-South Korea,0.02647338751502625,none,False,backsliding,0,0,0
-Indonesia,0.2132031145002387,alert,True,backsliding,1,1,1
-Mexico,0.07426243007860416,watch,True,backsliding,1,0,0
-Mongolia,0.10900516813624041,warning,True,backsliding,1,1,0
-Gabon,0.06204107950478434,watch,True,coup,1,0,0
-Haiti,0.14425695807186,alert,True,coup,1,1,1
-Cambodia,0.067840698175762,watch,True,backsliding,1,0,0
-Tajikistan,0.01151072004446142,none,False,backsliding,0,0,0
-Uganda,0.052457920454951054,none,False,backsliding,0,0,0
+Hungary,0.11236203908495762,warning,True,backsliding,1,1,0
+Türkiye,0.2381288427874662,alert,True,backsliding,1,1,1
+Poland,0.01981825686423007,none,False,backsliding,0,0,0
+Venezuela,0.0988620327880905,watch,True,backsliding,1,0,0
+Tunisia,0.1764384632294332,alert,True,backsliding,1,1,1
+Burma/Myanmar,0.15825893535428692,alert,True,coup,1,1,1
+Mali,0.11937359241743155,warning,True,coup,1,1,0
+Burkina Faso,0.07975359393904907,watch,True,coup,1,0,0
+Nicaragua,0.03418300107268092,none,False,backsliding,0,0,0
+Philippines,0.038292969705863114,none,False,backsliding,0,0,0
+India,0.14291078160079698,alert,True,backsliding,1,1,1
+Brazil,0.2521674747055035,alert,True,backsliding,1,1,1
+Serbia,0.03242101411751778,none,False,backsliding,0,0,0
+Bangladesh,0.20181094683210773,alert,True,backsliding,1,1,1
+Thailand,0.22419961386728346,alert,True,coup,1,1,1
+Egypt,0.2912611869266968,alert,True,coup,1,1,1
+Fiji,0.09923692109858132,watch,True,coup,1,0,0
+Niger,0.095837578063775,watch,True,coup,1,0,0
+Guinea,0.05032965703812068,none,False,coup,0,0,0
+Guinea-Bissau,0.07717577808336232,watch,True,coup,1,0,0
+Afghanistan,0.05102221242158095,none,False,coup,0,0,0
+Sudan,0.04368867831730987,none,False,coup,0,0,0
+Chad,0.23672761241173867,alert,True,coup,1,1,1
+Ukraine,0.04686785055261369,none,False,backsliding,0,0,0
+Maldives,0.12827693561113462,warning,True,backsliding,1,1,0
+Zambia,0.1172543062950541,warning,True,backsliding,1,1,0
+North Macedonia,0.08267100652715824,watch,True,backsliding,1,0,0
+Kenya,0.06046031061611528,watch,True,backsliding,1,0,0
+Bolivia,0.11057592890777285,warning,True,backsliding,1,1,0
+Benin,0.07425614052044827,watch,True,backsliding,1,0,0
+Ivory Coast,0.13087095190127812,warning,True,backsliding,1,1,0
+Nigeria,0.18749818321311348,alert,True,backsliding,1,1,1
+Guyana,0.11286266981455563,warning,True,backsliding,1,1,0
+Mauritius,0.10603336943766506,warning,True,backsliding,1,1,0
+Georgia,0.04748373059812569,none,False,backsliding,0,0,0
+Greece,0.10836429549858281,warning,True,backsliding,1,1,0
+Botswana,0.1051648839607199,warning,True,backsliding,1,1,0
+South Korea,0.03173341461977317,none,False,backsliding,0,0,0
+Indonesia,0.16263005439916367,alert,True,backsliding,1,1,1
+Mexico,0.06237634665927994,watch,True,backsliding,1,0,0
+Mongolia,0.062475740787604914,watch,True,backsliding,1,0,0
+Gabon,0.05925885507326348,watch,True,coup,1,0,0
+Haiti,0.21930969628972316,alert,True,coup,1,1,1
+Cambodia,0.08156715668260318,watch,True,backsliding,1,0,0
+Tajikistan,0.010145852071396434,none,False,backsliding,0,0,0
+Uganda,0.06626419102484796,watch,True,backsliding,1,0,0

@@ -1,7 +1,7 @@
 model,n,n_pos,base_rate,auc_roc,auc_pr,ap_lift,prec_top10,prec_top25,prec_top_decile
 Persistence (3-yr polyarchy decline),933,107,0.1147,0.5912,0.2102,1.83,0.5,0.32,0.28
 Four polyarchy variables,933,107,0.1147,0.7178,0.2263,1.97,0.3,0.32,0.269
-"Elastic net, all features",933,107,0.1147,0.6469,0.1814,1.58,0.4,0.2,0.161
-"Gradient boosting, all features",933,107,0.1147,0.6602,0.2118,1.85,0.4,0.36,0.226
-Random-forest ensemble,933,107,0.1147,0.7152,0.2044,1.78,0.1,0.2,0.204
-"Five-stage framework, rank-mean blend",933,107,0.1147,0.6726,0.1807,1.58,0.2,0.24,0.172
+"Elastic net, all features",933,107,0.1147,0.6544,0.1937,1.69,0.4,0.16,0.194
+"Gradient boosting, all features",933,107,0.1147,0.6739,0.2197,1.92,0.6,0.32,0.194
+Random-forest ensemble,933,107,0.1147,0.7152,0.2048,1.79,0.1,0.16,0.226
+"Five-stage framework, rank-mean blend",933,107,0.1147,0.6804,0.2028,1.77,0.3,0.2,0.204

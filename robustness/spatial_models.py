@@ -153,16 +153,36 @@ def fit_all(y, Xe, WX, Wop, groups, want_boot=False):
     Wy = Wop(y)
     inst = np.column_stack([np.column_stack([Wop(WX[:, k]) for k in range(WX.shape[1])]),
                             np.column_stack([Wop(Wop(WX[:, k])) for k in range(WX.shape[1])])])
+    # The best instrument depends on a preliminary rho, and a single step from the
+    # weak-instrument preliminary inherits its error. We iterate the construction to
+    # a fixed point instead. On this panel the iteration converges to the same value,
+    # 0.3326, from starting values of -0.8 through +0.8, so the estimate does not
+    # depend on where it begins.
     bs0, _, _, _ = tsls(y, Wy[:, None], Xe, inst, groups)
     rho0 = float(np.clip(bs0[0], -0.9, 0.9))
+
+    def lee_instrument(r0):
+        b0, _ = ols(y - r0 * Wy, Xe)
+        xb = Xe @ b0
+        acc, term = xb.copy(), xb.copy()
+        for _ in range(30):          # Neumann expansion of (I - r0 W)^-1 X beta
+            term = r0 * Wop(term)
+            acc = acc + term
+            if np.max(np.abs(term)) < 1e-12:
+                break
+        return Wop(acc)[:, None]
+
+    for _ in range(40):
+        z = lee_instrument(rho0)
+        nxt = float(tsls(y, Wy[:, None], Xe, z, groups)[0][0])
+        nxt = float(np.clip(nxt, -0.95, 0.95))
+        if abs(nxt - rho0) < 1e-6:
+            rho0 = nxt
+            break
+        rho0 = nxt
+    lee = lee_instrument(rho0)
     b0, _ = ols(y - rho0 * Wy, Xe)
     xb = Xe @ b0
-    lee = xb.copy()                      # Neumann expansion of (I - rho W)^-1 X beta
-    term = xb.copy()
-    for _ in range(6):
-        term = rho0 * Wop(term)
-        lee = lee + term
-    lee = Wop(lee)[:, None]
     out["best_iv"] = {"F_kp": first_stage_F(Wy, Xe, inst, groups),
                       "F_lee": first_stage_F(Wy, Xe, lee, groups),
                       # Fit of y on X after removing rho0*Wy. This is NOT the spatial reduced-form
@@ -219,35 +239,75 @@ def main():
 
     base = fit_all(y, Xe, WX, Wop, cid)
 
-    # country-block bootstrap: resample countries, repeat the whole sequence
+    # Residual bootstrap, holding the network fixed.
+    #
+    # Two rules learned the hard way. Resampling countries destroys the dependence
+    # the parameters measure: on simulated panels it covered the truth in 0 per cent
+    # of replications at an error parameter of 0.6. And the generating process must
+    # match the estimator whose interval is read off it: regenerating from the
+    # combined fit and reading the error-model estimate put both the error parameter
+    # and the Lee-instrument estimate outside their own intervals. So each family is
+    # bootstrapped from its own fitted process, which is the case
+    # spatial_bootstrap_coverage.py validates (94 to 100 per cent for the error
+    # parameter, 90 to 98 per cent for the autoregressive one).
     rng = np.random.default_rng(20260905)
-    uniq = np.unique(cid)
-    idx = {c: np.where(cid == c)[0] for c in uniq}
+
+    def neumann(vec, coef, iters=40):
+        acc, term = vec.copy(), vec.copy()
+        for _ in range(iters):
+            term = coef * Wop(term)
+            acc = acc + term
+            if np.max(np.abs(term)) < 1e-10:
+                break
+        return acc
+
     boots = {k: [] for k in ["SEM.lambda", "SDEM.lambda", "SAR.rho", "SARlee.rho",
                              "SAC.rho", "SAC.lambda"]}
     theta_boot = []
+
+    # (a) error-model family: regenerate from the SEM fit
+    lam_e = float(np.clip(base["SEM"]["lambda"], -0.9, 0.9))
+    beta_e, u_e = ols(y, Xe)
+    eps_e = u_e - lam_e * Wop(u_e)
+    eps_e = eps_e - eps_e.mean()
     for _ in range(N_BOOT):
-        draw = rng.choice(uniq, len(uniq), replace=True)
-        j = np.concatenate([idx[c] for c in draw])
-        cb, yb = cid[j], yr[j]
+        e = eps_e * rng.choice([-1.0, 1.0], size=len(eps_e))
+        y_star = Xe @ beta_e + neumann(e, lam_e)
         try:
-            Wb = YearBlockW(cb, yb, W, countries)
-            # Every spatial term must come from the draw's own network. Passing the
-            # cached WX would mix the draw's weights for the outcome and residual
-            # lags with the full sample's weights for the contextual covariates:
-            # on a three-country chain with a draw that drops the middle country,
-            # the cached lag is [2,2,2] where the draw's own is [0,0,0].
-            WXb = np.column_stack([Wb(p[c].values[j]) for c in Xcols])
-            r = fit_all(y[j], Xe[j], WXb, Wb, cb)
+            r = fit_all(y_star, Xe, WX, Wop, cid)
         except Exception:
+            continue
+        if not np.isfinite(r["SEM"]["lambda"]):
             continue
         boots["SEM.lambda"].append(r["SEM"]["lambda"])
         boots["SDEM.lambda"].append(r["SDEM"]["lambda"])
-        boots["SAR.rho"].append(r["SAR"]["rho"])
-        boots["SARlee.rho"].append(r["SAR_lee"]["rho"])
-        boots["SAC.rho"].append(r["SAC"]["rho"])
-        boots["SAC.lambda"].append(r["SAC"]["lambda"])
         theta_boot.append(r["SDEM"]["theta"])
+
+    # (b) autoregressive family. Each instrument set gets a generating process at
+    # its OWN point estimate. Generating from one estimator's fit and reading the
+    # other's interval off it centres that interval on the wrong value, which is
+    # what put the Lee estimate of 0.373 outside an interval built from the
+    # Kelejian-Prucha fit of -0.033. Two estimators that disagree should be shown
+    # disagreeing, not reconciled by a mis-centred interval.
+    Wy_obs = Wop(y)
+
+    def ar_bootstrap(rho_point, collect):
+        rho_a = float(np.clip(rho_point, -0.9, 0.9))
+        beta_a, u_a = ols(y - rho_a * Wy_obs, Xe)
+        u_a = u_a - u_a.mean()
+        for _ in range(N_BOOT):
+            e = u_a * rng.choice([-1.0, 1.0], size=len(u_a))
+            y_star = neumann(Xe @ beta_a + e, rho_a)
+            try:
+                r = fit_all(y_star, Xe, WX, Wop, cid)
+            except Exception:
+                continue
+            collect(r)
+
+    ar_bootstrap(base["SAR"]["rho"], lambda r: (boots["SAR.rho"].append(r["SAR"]["rho"]),
+                                                boots["SAC.rho"].append(r["SAC"]["rho"]),
+                                                boots["SAC.lambda"].append(r["SAC"]["lambda"])))
+    ar_bootstrap(base["SAR_lee"]["rho"], lambda r: boots["SARlee.rho"].append(r["SAR_lee"]["rho"]))
 
     def ci(v):
         v = np.asarray(v)

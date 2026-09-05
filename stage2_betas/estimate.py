@@ -11,41 +11,60 @@ FACTOR_COLS = ["factor_1", "factor_2", "factor_3", "factor_4"]
 MIN_OBS = 30
 MAX_TRAIN_YEAR = int(os.environ.get("AIM4D_CUTOFF", "2019"))
 WINSOR_Q = float(os.environ.get("AIM4D_BETA_WINSOR", "0.01"))
+WINSOR_MODE = os.environ.get("AIM4D_WINSOR_MODE", "symmetric")
 
 
 def winsorize_betas(beta_df, beta_cols, q=WINSOR_Q):
-    """Cap the upper-tail transition-era artifacts before they propagate.
+    """Cap extreme filtered loadings symmetrically before they propagate.
 
-    The state-space estimator produces spuriously large POSITIVE loadings
-    during synchronized democratization waves: the Gaussian TVP likelihood
-    pins the state-innovation variance at its upper bound, so the filtered
-    loading behaves as a near random walk and tracks the ratio of a country's
-    idiosyncratic move to a small contemporaneous global change (Stock &
-    Watson 1998; Harvey & Luati 2014). The 1989-1992 Eastern-Bloc transitions
-    dominate the right tail (Albania +20, Bulgaria +17, Romania +15, Hungary
-    +14), an order of magnitude beyond the bulk of the distribution. Left raw,
-    this cluster inflates the column mean/std used to standardize every other
-    country's node feature in Stage 4 and pushes the beta panel of Figure 5
-    off-scale.
+    The time-varying-parameter filter produces heavy tails at both ends. The
+    1989-1992 Eastern-Bloc transitions dominate the right tail (Albania +20,
+    Bulgaria +17, Romania +15, Hungary +14) and a comparable cluster sits in
+    the left tail. Left raw, either inflates the column mean and standard
+    deviation used to standardize every other country's node feature in
+    Stage 4, and pushes the beta panel off-scale.
 
-    We winsorize the UPPER tail of each beta column at its (1-q) training
-    percentile. The artifact is directional: the lower tail is retained
-    because large negative loadings occur in normal-variance periods and
-    reflect genuine counter-movement against the global trend (Hungary's
-    -8 to -11 onset signature around 2009-2011, the clearest such signal in
-    the panel), which is substantive rather than artefactual. Bounds are fit
-    on the pre-cutoff training rows only (year <= MAX_TRAIN_YEAR) and applied
-    to all rows, matching the leakage discipline used elsewhere in the
-    pipeline (Tukey 1977; Leys et al. 2013).
+    Earlier versions clipped only the upper tail, justified on the grounds
+    that large positive loadings arise when the filter divides an idiosyncratic
+    country move by a small contemporaneous change in the global factor, while
+    large negative loadings reflect genuine counter-movement. That
+    justification does not survive measurement. The mean absolute leave-one-out
+    global change is 0.107 across 1989-1992, some 4.7 times the panel mean,
+    and 0.014 across 2009-2011, about 0.6 times it. The small-denominator
+    mechanism therefore describes the tail that clipping RETAINED, not the one
+    it removed, and an asymmetric rule defended by a reversed mechanism is an
+    outcome-directed researcher degree of freedom.
+
+    We therefore clip both tails at matched percentiles. Doing so leaves
+    downstream results unchanged: leave-one-episode-out detection holds at
+    32/46 at the watch tier, and the 2019 hold-out moves from 0.9345 to 0.9361
+    in AUC. What it removes is the beta trajectory reading of a single case,
+    since Hungary's 2008-2011 excursion is clipped to the lower bound. No
+    result in the paper rests on that reading.
+
+    Bounds are fit on the pre-cutoff training rows only (year <=
+    MAX_TRAIN_YEAR) and applied to all rows, matching the leakage discipline
+    used elsewhere in the pipeline (Tukey 1977; Leys et al. 2013). Set
+    AIM4D_WINSOR_MODE to "upper" or "none" to reproduce the alternatives.
     """
     train = beta_df["year"] <= MAX_TRAIN_YEAR
     bounds = {}
+    if WINSOR_MODE == "none":
+        print("  winsorize: DISABLED (AIM4D_WINSOR_MODE=none)")
+        return beta_df, bounds
     for col in beta_cols:
         hi = float(beta_df.loc[train, col].quantile(1 - q))
-        n_clip = int((beta_df[col] > hi).sum())
-        beta_df[col] = beta_df[col].clip(upper=hi)
-        bounds[col] = (hi, n_clip)
-        print(f"  winsorize {col}: upper cap={hi:+.3f}  clipped={n_clip}")
+        if WINSOR_MODE == "symmetric":
+            lo = float(beta_df.loc[train, col].quantile(q))
+            n_clip = int(((beta_df[col] > hi) | (beta_df[col] < lo)).sum())
+            beta_df[col] = beta_df[col].clip(lower=lo, upper=hi)
+            bounds[col] = (lo, hi, n_clip)
+            print(f"  winsorize {col}: symmetric [{lo:+.3f}, {hi:+.3f}]  clipped={n_clip}")
+        else:
+            n_clip = int((beta_df[col] > hi).sum())
+            beta_df[col] = beta_df[col].clip(upper=hi)
+            bounds[col] = (hi, n_clip)
+            print(f"  winsorize {col}: upper cap={hi:+.3f}  clipped={n_clip}")
     return beta_df, bounds
 
 

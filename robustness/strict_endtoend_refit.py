@@ -161,7 +161,14 @@ def main():
     from scipy.stats import rankdata
     b = d.pivot_table(index=["origin", "country_name", "y"], columns="learner", values="p").reset_index()
     cols = [c for c in ["gb", "rf", "lr"] if c in b.columns]
-    b["blend"] = np.mean([rankdata(b[c].values) / len(b) for c in cols], axis=0)
+    # Rank within each origin, not across the pooled evaluation rows.
+    def within(v):
+        r = np.zeros(len(v))
+        for o in np.unique(b["origin"].values):
+            sel = b["origin"].values == o
+            r[sel] = rankdata(v[sel]) / sel.sum()
+        return r
+    b["blend"] = np.mean([within(b[c].values) for c in cols], axis=0)
     print(f"  rank-mean blend: AUC {roc_auc_score(b.y, b.blend):.3f}  "
           f"AP {average_precision_score(b.y, b.blend):.3f}  n={len(b)} pos={int(b.y.sum())}")
     print("\nWrote strict_endtoend_refit.csv")

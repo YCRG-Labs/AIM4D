@@ -121,7 +121,7 @@ def main():
         max_iter=2000, class_weight="balanced"))
     preds["Elastic net, all features"] = rolling(d, allf, lambda: LogisticRegression(
         penalty="elasticnet", solver="saga", l1_ratio=0.5, C=0.1, max_iter=3000,
-        class_weight="balanced"))
+        class_weight="balanced", random_state=0))
     preds["Gradient boosting, all features"] = rolling(d, allf, lambda: GradientBoostingClassifier(
         n_estimators=200, max_depth=3, learning_rate=0.05, subsample=0.8,
         min_samples_leaf=10, random_state=0))
@@ -131,13 +131,21 @@ def main():
     # framework: rank-mean blend of the three learner families on the framework features
     parts = [preds[k] for k in ["Elastic net, all features", "Gradient boosting, all features",
                                 "Random-forest ensemble"] if len(preds[k])]
+    # Ranks are formed within each origin's eligible set. Ranking over the pooled
+    # rows would let an early origin's blended score depend on predictions made at
+    # later origins, which a forecaster at that origin could not have known.
     key = ["country_name", "year", "y"]
     blend = parts[0][key].copy()
-    r = np.zeros(len(blend))
+    acc = np.zeros(len(blend))
     for pt in parts:
         m = blend.merge(pt, on=key, how="left")
-        r = r + rankdata(m["p"].fillna(m["p"].median()).values) / len(m)
-    blend["p"] = r / len(parts)
+        v = m["p"].fillna(m["p"].median()).values
+        r = np.zeros(len(v))
+        for yr in np.unique(m["year"].values):
+            sel = m["year"].values == yr
+            r[sel] = rankdata(v[sel]) / sel.sum()
+        acc = acc + r
+    blend["p"] = acc / len(parts)
     preds["Five-stage framework, rank-mean blend"] = blend
 
     common = None

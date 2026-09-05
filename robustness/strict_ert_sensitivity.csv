@@ -1,0 +1,6 @@
+model,n,n_pos,base_rate,auc_roc,auc_pr
+Four polyarchy variables,1002,179,0.1786,0.7053,0.3005
+Five-stage framework,1002,179,0.1786,0.7314,0.3474
+Gradient boosting,1002,179,0.1786,0.6812,0.325
+Random forest,1002,179,0.1786,0.7358,0.3353
+Elastic net,1002,179,0.1786,0.6763,0.301

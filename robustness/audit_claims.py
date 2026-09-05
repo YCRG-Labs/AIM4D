@@ -57,11 +57,11 @@ check("C1", "refit CV mean AP", 0.524, round(cv["ap"].mean(), 3), in_tex="0.524"
 
 b = csv("bootstrap_cis.csv").set_index("metric")
 for cid, metric, rep, lo, hi, tx in [
-    ("C2", "auc_roc_oos_2019", 0.934, 0.776, 0.977, "0.934"),
-    ("C2", "auc_pr_oos_2019", 0.656, 0.434, 0.816, "0.656"),
-    ("C2", "bss_oos_2019", 0.231, 0.041, 0.344, "0.231"),
-    ("C7", "auc_fh_3yr_decline_2pt", 0.770, 0.722, 0.833, "0.77"),
-    ("C7", "auc_polity_3yr_decline_3pt", 0.743, 0.694, 0.780, "0.74"),
+    ("C2", "auc_roc_oos_2019", 0.937, 0.782, 0.979, "0.937"),
+    ("C2", "auc_pr_oos_2019", 0.661, 0.432, 0.819, "0.661"),
+    ("C2", "bss_oos_2019", 0.229, 0.025, 0.347, "0.229"),
+    ("C7", "auc_fh_3yr_decline_2pt", 0.767, 0.720, 0.831, "0.77"),
+    ("C7", "auc_polity_3yr_decline_3pt", 0.746, 0.699, 0.784, "0.74"),
 ]:
     if metric in b.index:
         r = b.loc[metric]
@@ -83,14 +83,14 @@ lo = csv("loeo_results.csv", sub=os.path.join(REPO, "stage5_ews"))
 w = int(lo["detected_watch"].sum())
 wn = int(lo["detected_warning"].sum())
 al = int(lo["detected_alert"].sum())
-check("C4", "LOEO watch", 32, w, kind="exact", in_tex="32/46")
-check("C4", "LOEO warning", 18, wn, kind="exact", in_tex="18/46")
-check("C4", "LOEO alert", 12, al, kind="exact", in_tex="12/46")
+check("C4", "LOEO watch", 30, w, kind="exact", in_tex="30/46")
+check("C4", "LOEO warning", 21, wn, kind="exact", in_tex="21/46")
+check("C4", "LOEO alert", 13, al, kind="exact", in_tex="13/46")
 if "type" in lo.columns:
     bs = lo[lo["type"].astype(str).str.contains("backslid", case=False, na=False)]
     cp = lo[~lo.index.isin(bs.index)]
-    check("C4", "backsliding detected", 22, int(bs["detected_watch"].sum()), kind="exact", in_tex="22 of 32")
-    check("C4", "coup detected", 10, int(cp["detected_watch"].sum()), kind="exact", in_tex="10 of 14")
+    check("C4", "backsliding detected", 21, int(bs["detected_watch"].sum()), kind="exact", in_tex="21 of 32")
+    check("C4", "coup detected", 9, int(cp["detected_watch"].sum()), kind="exact", in_tex="9 of 14")
 
 sp = csv("sample_pipeline_loeo.csv")
 check("C5", "15-ep LOEO mean delta", 0.081, round(float(sp["delta_risk"].mean()), 3), in_tex="0.081")

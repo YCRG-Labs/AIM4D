@@ -53,6 +53,11 @@ EXCLUDE_COLS = {
     "combined_alert", "combined_alert_legacy", "ews_alert", "raw_alert",
     "election_alert", "dem_vulnerability_alert", "military_threat_alert",
     "mv_csd_alert", "n_factors", "is_postonset",
+    # Episode bookkeeping. These describe the outcome and must never reach a
+    # model: onset_year and peak_year are non-null only for countries that have
+    # an episode, and their values say when it happened. Leaving peak_year out
+    # of this set once raised the elastic-net AUC from 0.64 to 0.85.
+    "onset_year", "peak_year", "ep_end", "in_episode", "at_risk",
 }
 
 
@@ -74,9 +79,20 @@ def build_panel():
     d = d.merge(v, on=["country_name", "year"], how="left")
 
     onset = {c: info["onset"] for c, info in KNOWN_EPISODES.items()}
+    peak = {c: info.get("peak", info["onset"]) for c, info in KNOWN_EPISODES.items()}
     d["onset_year"] = d["country_name"].map(onset)
+    d["peak_year"] = d["country_name"].map(peak)
+
+    # An episode runs from its onset to its peak. Treating a country as
+    # permanently in-episode after any onset removes exactly the units most
+    # exposed to a second one: Venezuela's 2002 onset would exclude it for the
+    # following 23 years. Membership therefore ends at the peak, after which a
+    # country that is still coded a democracy re-enters the at-risk pool.
+    span = (d["onset_year"].notna()
+            & (d["year"] >= d["onset_year"])
+            & (d["year"] <= d["peak_year"]))
     in_ep = d["is_postonset"].fillna(False).astype(bool) if "is_postonset" in d.columns else False
-    d["in_episode"] = in_ep | (d["onset_year"].notna() & (d["year"] >= d["onset_year"]))
+    d["in_episode"] = span | in_ep
     d["at_risk"] = (d["v2x_regime"] >= 2) & (~d["in_episode"])
     return d
 

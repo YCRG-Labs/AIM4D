@@ -36,7 +36,11 @@ from onset_forecast_clean import EXCLUDE_COLS, build_panel, learner
 OUT = os.path.dirname(os.path.abspath(__file__))
 H = 5
 T0 = 2019
-ORIGINS = list(range(2005, 2026))
+LAST_OBS = 2025
+# An origin needs its whole outcome window inside the observed panel. With onsets
+# observed through 2025 and h=5, origins past 2020 would score rows against
+# outcomes that cannot yet have happened, coding them 0 by default.
+ORIGINS = list(range(2005, LAST_OBS - H + 1))
 SEEDS = [0, 1, 2]
 
 
@@ -59,6 +63,9 @@ def score(d, feats, name, seed, restrict, future_only, rolling, closure):
     for T in origins:
         tr = pool[pool.year <= T - lag]
         te = pool[pool.year == T] if rolling else pool[pool.year > T]
+        # Scored rows also need a closed outcome window, or a censored row is
+        # counted as a negative.
+        te = te[te.year <= LAST_OBS - H]
         if len(te) == 0 or tr["y"].sum() < 5 or te["y"].sum() < 1:
             continue
         sc = StandardScaler()

@@ -1,0 +1,11 @@
+model,param,est,ci_low,ci_high,note
+SEM,lambda,0.054,-0.0138,0.1118,
+SDEM,lambda,0.0526,-0.0158,0.1094,
+SAC,lambda,0.0859,-0.4663,0.6306,
+SAR,rho,-0.0332,-0.7021,0.5277,cluster-robust first-stage F 2.0
+SAC,rho,-0.0783,-0.8501,0.7891,generalised spatial 2SLS
+SDEM,theta_W.y_lag,0.0051,-0.0059,0.0176,
+SDEM,theta_W.gdp_pc,0.0005,-0.0068,0.0089,
+SDEM,theta_W.urbanization,-0.0008,-0.0088,0.0089,
+SDEM,theta_W.trade_openness,-0.0068,-0.0159,0.0006,
+common factor,theta + rho*beta (lagged factor),0.0066,-0.0149,0.0273,zero is the Durbin common-factor restriction

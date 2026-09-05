@@ -47,7 +47,14 @@ def recover():
     m = r.merge(s[["country_text_id", "year"] + pc], on=["country_text_id", "year"], how="inner")
     Y = m[pc].to_numpy(float)
     Pf = Y - m[[f"nscm_resid_full_{k}" for k in range(K)]].to_numpy(float)
-    Pl = Y - m[[f"nscm_resid_domestic_{k}" for k in range(K)]].to_numpy(float)
+    # Comparator choice. nscm_resid_domestic comes from the ego head, which
+    # bypasses message passing but still receives the weighted spatial lags.
+    # nscm_resid_truedom comes from a head fed the own-country block alone and is
+    # the right comparator for "without network information"; the ego head is
+    # retained under AIM4D_NETDEP_COMPARATOR=ego for the earlier figures.
+    which = os.environ.get("AIM4D_NETDEP_COMPARATOR", "truedom")
+    col = "nscm_resid_truedom" if which == "truedom" and f"nscm_resid_truedom_0" in m.columns else "nscm_resid_domestic"
+    Pl = Y - m[[f"{col}_{k}" for k in range(K)]].to_numpy(float)
     assert np.allclose(Pf.sum(1), 1, atol=1e-4) and np.allclose(Pl.sum(1), 1, atol=1e-4)
     return m, Pf, Pl
 

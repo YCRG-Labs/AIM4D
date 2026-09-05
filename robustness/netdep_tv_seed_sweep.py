@@ -38,7 +38,9 @@ def _one(s, x, y, edge_index, full_ei, mask_train, mask_test, in_dim,
     with torch.no_grad():
         h_full, h_ego = model.encode(x, full_ei)
         Pf = F.softmax(model.outcome_logits(h_full), dim=-1).numpy()
-        Pl = F.softmax(model.local_logits(h_ego), dim=-1).numpy()
+        # Comparator fed the own-country block alone. The ego head is not usable
+        # here: it drops message passing but keeps the weighted spatial lags.
+        Pl = model.domestic_only(x).numpy()
 
     tv = 0.5 * np.abs(Pf - Pl).sum(axis=1)
     lvl = np.arange(K, dtype=float)

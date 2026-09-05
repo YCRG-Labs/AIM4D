@@ -294,6 +294,19 @@ class INETARNet(nn.Module):
             nn.Linear(hidden, outcome_dim),
         )
 
+        # A comparator that never sees neighbour-derived features. The ego head
+        # above bypasses message passing but still receives the weighted spatial
+        # lags, so it cannot stand for "no network information". This one is fed
+        # the own-country block alone.
+        self.domestic_encoder = nn.Sequential(
+            nn.Linear(in_dim - self.spatial_lag_dim, hidden), nn.ELU(),
+            nn.Linear(hidden, hidden),
+        )
+        self.domestic_logits = nn.Sequential(
+            nn.Linear(hidden, hidden), nn.ELU(),
+            nn.Linear(hidden, outcome_dim),
+        )
+
         self.gps_mu = nn.Sequential(nn.Linear(repr_dim, hidden), nn.ELU(), nn.Linear(hidden, treatment_dim))
         self.gps_logvar = nn.Sequential(nn.Linear(repr_dim, hidden), nn.ELU(), nn.Linear(hidden, treatment_dim))
 
@@ -331,13 +344,18 @@ class INETARNet(nn.Module):
             h_exp = torch.zeros_like(h_ego)
         return torch.cat([h_ego, h_gnn, h_exp], dim=-1), h_ego
 
+    def domestic_only(self, x):
+        base_dim = x.shape[1] - self.spatial_lag_dim
+        return F.softmax(self.domestic_logits(self.domestic_encoder(x[:, :base_dim])), dim=-1)
+
     def forward(self, x, edge_index):
         h_full, h_ego = self.encode(x, edge_index)
         y_full = F.softmax(self.outcome_logits(h_full), dim=-1)
         y_local = F.softmax(self.local_logits(h_ego), dim=-1)
+        y_domestic = self.domestic_only(x)
         gps_mu = self.gps_mu(h_full)
         gps_logvar = self.gps_logvar(h_full).clamp(-5, 5)
-        return y_full, y_local, gps_mu, gps_logvar
+        return y_full, y_local, y_domestic, gps_mu, gps_logvar
 
     def counterfactual_decompose(self, x, edge_index, spatial_edge_index):
         with torch.no_grad():
@@ -365,7 +383,26 @@ def mmd_kernel(h1, h2, bandwidth=1.0):
     return k11 + k22 - 2 * k12
 
 
-def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42):
+def split_val_test(mask_test, node_year):
+    """Split the post-cutoff block into a selection set and an untouched test set.
+
+    Retaining the parameter state that minimises error on the evaluation rows
+    makes those rows a selection set, so the resulting figure is not an
+    out-of-sample estimate. The earlier post-cutoff years select; the later ones
+    are scored once and never used for selection.
+    """
+    yrs = torch.as_tensor(node_year)[mask_test]
+    if yrs.numel() == 0:
+        return mask_test, mask_test
+    cut = int(torch.quantile(yrs.float(), 0.5).item())
+    mv = mask_test & (torch.as_tensor(node_year) <= cut)
+    mt = mask_test & (torch.as_tensor(node_year) > cut)
+    if mt.sum() == 0 or mv.sum() == 0:
+        return mask_test, mask_test
+    return mv, mt
+
+
+def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42, mask_val=None):
     torch.manual_seed(seed)
     np.random.seed(seed)
     model = INETARNet(in_dim)
@@ -379,10 +416,11 @@ def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42):
         model.train()
         optimizer.zero_grad()
 
-        y_full, y_local, gps_mu, gps_logvar = model(x, edge_index)
+        y_full, y_local, y_domestic, gps_mu, gps_logvar = model(x, edge_index)
 
         loss_out = F.mse_loss(y_full[mask_train], y[mask_train])
         loss_local = F.mse_loss(y_local[mask_train], y[mask_train])
+        loss_dom = F.mse_loss(y_domestic[mask_train], y[mask_train])
 
         treatment = x[mask_train, :TREATMENT_DIM]
         var = gps_logvar[mask_train].exp()
@@ -393,7 +431,7 @@ def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42):
         med = treatment[:, 0].median()
         balance = mmd_kernel(h_train[treatment[:, 0] > med], h_train[treatment[:, 0] <= med])
 
-        loss = loss_out + 0.3 * loss_local + 0.3 * gps_nll + 0.2 * balance
+        loss = loss_out + 0.3 * loss_local + 0.3 * loss_dom + 0.3 * gps_nll + 0.2 * balance
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -404,7 +442,8 @@ def train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=42):
             model.eval()
             with torch.no_grad():
                 yp, *_ = model(x, edge_index)
-                test_mse = F.mse_loss(yp[mask_test], y[mask_test]).item()
+                sel = mask_val if mask_val is not None else mask_test
+                test_mse = F.mse_loss(yp[sel], y[sel]).item()
             if test_mse < best_test:
                 best_test = test_mse
                 best_state = {k: v.clone() for k, v in model.state_dict().items()}
@@ -421,15 +460,15 @@ def network_ablation_test(model, x, y, edge_index, spatial_ei, temporal_ei,
     model.eval()
     with torch.no_grad():
         full_ei = torch.cat([spatial_ei, temporal_ei], dim=1)
-        y_full, _, _, _ = model(x, full_ei)
+        y_full, _, _, _, _ = model(x, full_ei)
         mse_full = F.mse_loss(y_full[mask_test], y[mask_test]).item()
 
-        y_temporal, _, _, _ = model(x, temporal_ei)
+        y_temporal, _, _, _, _ = model(x, temporal_ei)
         mse_temporal = F.mse_loss(y_temporal[mask_test], y[mask_test]).item()
 
         x_no_lag = x.clone()
         x_no_lag[:, -TREATMENT_DIM * 3:] = 0.0
-        y_no_lag, _, _, _ = model(x_no_lag, temporal_ei)
+        y_no_lag, _, _, _, _ = model(x_no_lag, temporal_ei)
         mse_no_network = F.mse_loss(y_no_lag[mask_test], y[mask_test]).item()
 
     improvement_spatial = (mse_temporal - mse_full) / mse_temporal * 100
@@ -475,7 +514,12 @@ def run_stage4(seed=42, write_outputs=True):
     print(f"  Train nodes: {mask_train.sum()}, Test nodes: {mask_test.sum()}")
 
     print(f"\nTraining INE-TARNet on spatio-temporal graph...")
-    model = train_model(x, y, edge_index, mask_train, mask_test, in_dim, seed=seed)
+    mask_val, mask_eval = split_val_test(mask_test, node_year)
+    print(f"  selection rows {int(mask_val.sum())}, untouched test rows {int(mask_eval.sum())}")
+    model = train_model(x, y, edge_index, mask_train, mask_eval, in_dim, seed=seed, mask_val=mask_val)
+    with torch.no_grad():
+        yp, *_ = model(x, torch.cat([spatial_ei, temporal_ei], dim=1))
+        print(f"  MSE on untouched test rows: {F.mse_loss(yp[mask_eval], y[mask_eval]).item():.6f}")
 
     w_weights = model.get_w_weights().detach().numpy()
     w_names = ["contiguity", "alliance", "trade", "cultural"][:len(w_weights)]
@@ -494,9 +538,10 @@ def run_stage4(seed=42, write_outputs=True):
         full_ei = torch.cat([spatial_ei, temporal_ei], dim=1)
         y_full, domestic, spillover = model.counterfactual_decompose(x, full_ei, spatial_ei)
 
-        y_pred_full, y_pred_local, _, _ = model(x, full_ei)
+        y_pred_full, y_pred_local, y_pred_dom, _, _ = model(x, full_ei)
         nscm_resid_full = (y - y_pred_full).numpy()
         nscm_resid_domestic = (y - y_pred_local).numpy()
+        nscm_resid_truedom = (y - y_pred_dom).numpy()
 
     resid_rows = []
     for nid in range(len(node_country)):
@@ -504,6 +549,7 @@ def run_stage4(seed=42, write_outputs=True):
         for k in range(OUTCOME_DIM):
             rrow[f"nscm_resid_full_{k}"] = nscm_resid_full[nid, k]
             rrow[f"nscm_resid_domestic_{k}"] = nscm_resid_domestic[nid, k]
+            rrow[f"nscm_resid_truedom_{k}"] = nscm_resid_truedom[nid, k]
         resid_rows.append(rrow)
     resid_df = pd.DataFrame(resid_rows)
     resid_df.to_csv(os.path.join(output_dir, "nscm_residuals.csv"), index=False)

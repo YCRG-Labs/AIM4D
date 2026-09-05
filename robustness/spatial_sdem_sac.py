@@ -1,31 +1,33 @@
 """
-SDEM and SAC estimated properly.
+WITHDRAWN. The error-parameter estimator in this script is wrong.
 
-The withdrawn attempt in spatial_model_ladder.py failed three ways: it regressed
-the outcome change on neighbours' outcome changes while calling that a lagged-
-covariate model, it instrumented the spatial lag with a term built from a
-leave-one-out mean of the outcome, and it selected between specifications by
-residual Moran's I. This replaces all three.
+The lagged covariates and instruments here are sound: W is applied only to
+predetermined and exogenous variables, and the autoregressive term is
+instrumented by second and third spatial lags of those same covariates, so
+nothing built from the outcome enters. That part is kept for reuse.
 
-The lagged covariates are W applied to genuinely exogenous or predetermined
-variables only: the lagged level of the democratic factor and the macroeconomic
-covariates, never the contemporaneous outcome change. The instruments for the
-autoregressive term are the second and third spatial lags of those same
-exogenous covariates, following Kelejian and Prucha; nothing built from the
-outcome enters the instrument set. Selection between specifications is by a
-common-factor test rather than by a residual diagnostic: SDEM nests SEM, so the
-lagged-covariate coefficients are tested jointly, and SAC nests SAR and SEM.
+The error parameter is not. kp_lambda minimises the squares of
 
-    SEM   dy = X b + u,             u = lam W u + e
-    SDEM  dy = X b + WX th + u,     u = lam W u + e
-    SAR   dy = rho W dy + X b + e
-    SAC   dy = rho W dy + X b + u,  u = lam W u + e
+    g1 = (e'e - (We)'(We)) / n,   g2 = e'We / n,    e = u - lam*W*u
 
-lambda is estimated by the Kelejian-Prucha generalised moments estimator, which
-is a moment condition on the residuals rather than a likelihood, and the model is
-then refit on spatially filtered data.
+and g1 is not a zero-mean moment at the true parameter. For innovations of
+variance s2 its expectation is s2*(1 - tr(W'W)/n), and row standardisation does
+not make that trace ratio one. A generalised-moments estimator of a spatial
+error process needs the trace correction and the innovation variance; this omits
+both. On a row-standardised 100-node cycle with a true parameter of 0.6 and unit
+innovations, the population version of this objective is minimised at 0.646.
 
-Outputs robustness/spatial_sdem_sac.csv.
+Two further gaps. The docstring promised a refit on spatially filtered data and
+the code never filters or refits, so the reported quantities are ordinary and
+two-stage fits with an error parameter computed alongside them, not estimates of
+the error model. And the joint F on the lagged covariates tests the nesting of
+the lagged-covariate model inside the error model; it is not the common-factor
+restriction, which relates the autoregressive, own-covariate and lagged-covariate
+coefficients.
+
+No value produced by this script is reported in the paper. Replace kp_lambda
+with a validated implementation, complete the filtered refit, and check the
+result against a known spatial process before using anything here.
 """
 
 import os

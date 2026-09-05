@@ -135,7 +135,42 @@ def main():
         print(f"  {name:<26} AUC {r['auc_roc']:.3f}  AP {r['auc_pr']:.3f}  "
               f"n={r['n']} pos={r['n_pos']} base={r['base_rate']:.3f}")
     pd.DataFrame(rows).to_csv(os.path.join(OUT, "strict_ert_sensitivity.csv"), index=False)
-    print("\nWrote strict_ert_sensitivity.csv")
+
+    # Row-level predictions, so the paired intervals below can be reproduced.
+    preds = b.rename(columns={"p": "p_framework"}).merge(
+        p4.rename(columns={"p": "p_poly4"}), on=["year", "country_name", "y"])
+    preds.to_csv(os.path.join(OUT, "strict_ert_sensitivity_predictions.csv"), index=False)
+
+    def paired(df, a, c, seed=20260905, n_boot=2000):
+        rng = np.random.default_rng(seed)
+        u = df["country_name"].unique()
+        idx = {k: np.where(df["country_name"].values == k)[0] for k in u}
+        da, dp = [], []
+        for _ in range(n_boot):
+            j = np.concatenate([idx[k] for k in rng.choice(u, len(u), replace=True)])
+            if df["y"].values[j].sum() < 3:
+                continue
+            da.append(roc_auc_score(df["y"].values[j], df[a].values[j])
+                      - roc_auc_score(df["y"].values[j], df[c].values[j]))
+            dp.append(average_precision_score(df["y"].values[j], df[a].values[j])
+                      - average_precision_score(df["y"].values[j], df[c].values[j]))
+        f = lambda v: (np.mean(v), np.percentile(v, 2.5), np.percentile(v, 97.5))
+        return f(da), f(dp)
+
+    (ma, la, ha), (mp, lp, hp) = paired(preds, "p_framework", "p_poly4")
+    print(f"\nframework minus four variables, all origins ({preds.year.min()}--{preds.year.max()}):")
+    print(f"  dAUC {ma:+.3f} [{la:+.3f}, {ha:+.3f}]   dAP {mp:+.3f} [{lp:+.3f}, {hp:+.3f}]")
+
+    # The paper's episode set skips 2005-2007 under the five-positive training rule,
+    # so the two outcome definitions are not scored on the same origins. Restricting
+    # to the common window separates the outcome change from the sample change.
+    common = preds[preds.year >= 2008]
+    (ma2, la2, ha2), (mp2, lp2, hp2) = paired(common, "p_framework", "p_poly4")
+    print(f"common origins 2008--2020 only, n={len(common)} pos={int(common.y.sum())}:")
+    print(f"  dAUC {ma2:+.3f} [{la2:+.3f}, {ha2:+.3f}]   dAP {mp2:+.3f} [{lp2:+.3f}, {hp2:+.3f}]")
+    print("\nNote: this reuses the existing upstream EWS features and reruns only the")
+    print("downstream learners. It does not rebuild the pipeline at each origin.")
+    print("\nWrote strict_ert_sensitivity.csv and strict_ert_sensitivity_predictions.csv")
 
 
 if __name__ == "__main__":

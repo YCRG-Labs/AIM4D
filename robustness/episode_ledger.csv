@@ -1,119 +1,119 @@
 country_name,country_text_id,aut_ep_id,onset,end,outcome,censored,paper_onset,paper_peak,paper_type,status
-Afghanistan,AFG,AFG_2021_2025,2021.0,2025.0,3.0,1.0,2021.0,2022.0,coup,matched
-Argentina,ARG,ARG_2024_2025,2024.0,2025.0,4.0,1.0,,,,ert_only
-Armenia,ARM,ARM_2020_2025,2020.0,2025.0,4.0,1.0,,,,ert_only
+Afghanistan,AFG,AFG_2021_2025,2021.0,2025.0,3.0,1.0,2021.0,2022.0,coup,onset_matches_ert
+Argentina,ARG,ARG_2024_2025,2024.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Armenia,ARM,ARM_2020_2025,2020.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
 Bangladesh,BGD,BGD_2002_2007,2002.0,2007.0,1.0,0.0,2007.0,2024.0,backsliding,onset_differs
-Bangladesh,BGD,BGD_2013_2018,2013.0,2018.0,3.0,0.0,2007.0,2024.0,backsliding,onset_differs
+Bangladesh,BGD,BGD_2013_2018,2013.0,2018.0,3.0,0.0,,,,in_ert_absent_from_paper_set
 Belarus,BLR,BLR_2020_2025,2020.0,2025.0,3.0,1.0,1996.0,2024.0,backsliding,onset_differs
-Benin,BEN,BEN_2018_2021,2018.0,2021.0,1.0,0.0,2019.0,2023.0,backsliding,onset_differs
+Benin,BEN,BEN_2018_2021,2018.0,2021.0,1.0,0.0,2019.0,2023.0,backsliding,onset_within_2yr
 Bolivia,BOL,BOL_2006_2020,2006.0,2020.0,1.0,0.0,2019.0,2022.0,backsliding,onset_differs
-Bosnia and Herzegovina,BIH,BIH_2004_2007,2004.0,2007.0,2.0,0.0,,,,ert_only
+Bosnia and Herzegovina,BIH,BIH_2004_2007,2004.0,2007.0,2.0,0.0,,,,in_ert_absent_from_paper_set
 Botswana,BWA,BWA_2015_2022,2015.0,2022.0,2.0,0.0,2021.0,2024.0,backsliding,onset_differs
 Brazil,BRA,BRA_2015_2019,2015.0,2019.0,2.0,0.0,2019.0,2022.0,backsliding,onset_differs
 Burkina Faso,BFA,BFA_2014_2015,2014.0,2015.0,1.0,0.0,2022.0,2022.0,coup,onset_differs
-Burkina Faso,BFA,BFA_2018_2025,2018.0,2025.0,1.0,1.0,2022.0,2022.0,coup,onset_differs
-Burma/Myanmar,MMR,MMR_2021_2025,2021.0,2025.0,3.0,1.0,2021.0,2022.0,coup,matched
-Burundi,BDI,BDI_2010_2016,2010.0,2016.0,3.0,0.0,,,,ert_only
-Cambodia,KHM,KHM_2016_2025,2016.0,2025.0,3.0,1.0,2017.0,2024.0,backsliding,onset_differs
-Central African Republic,CAF,CAF_2003_2004,2003.0,2004.0,3.0,0.0,,,,ert_only
-Central African Republic,CAF,CAF_2019_2025,2019.0,2025.0,3.0,1.0,,,,ert_only
+Burkina Faso,BFA,BFA_2018_2025,2018.0,2025.0,1.0,1.0,,,,in_ert_absent_from_paper_set
+Burma/Myanmar,MMR,MMR_2021_2025,2021.0,2025.0,3.0,1.0,2021.0,2022.0,coup,onset_matches_ert
+Burundi,BDI,BDI_2010_2016,2010.0,2016.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Cambodia,KHM,KHM_2016_2025,2016.0,2025.0,3.0,1.0,2017.0,2024.0,backsliding,onset_within_2yr
+Central African Republic,CAF,CAF_2003_2004,2003.0,2004.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Central African Republic,CAF,CAF_2019_2025,2019.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
 Chad,TCD,TCD_2017_2022,2017.0,2022.0,3.0,0.0,2021.0,2022.0,coup,onset_differs
-Comoros,COM,COM_1999_2000,1999.0,2000.0,3.0,0.0,,,,ert_only
-Comoros,COM,COM_2015_2020,2015.0,2020.0,3.0,0.0,,,,ert_only
-Croatia,HRV,HRV_2013_2025,2013.0,2025.0,4.0,1.0,,,,ert_only
-Czechia,CZE,CZE_2013_2021,2013.0,2021.0,2.0,0.0,,,,ert_only
-Ecuador,ECU,ECU_2007_2013,2007.0,2013.0,2.0,0.0,,,,ert_only
-Egypt,EGY,EGY_2013_2014,2013.0,2014.0,3.0,0.0,2013.0,2014.0,coup,matched
-El Salvador,SLV,SLV_2018_2025,2018.0,2025.0,1.0,1.0,2019.0,2024.0,backsliding,onset_differs
-Fiji,FJI,FJI_2000_2001,2000.0,2001.0,1.0,0.0,2006.0,2007.0,coup,onset_differs
-Fiji,FJI,FJI_2006_2007,2006.0,2007.0,3.0,0.0,2006.0,2007.0,coup,matched
+Comoros,COM,COM_1999_2000,1999.0,2000.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Comoros,COM,COM_2015_2020,2015.0,2020.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Croatia,HRV,HRV_2013_2025,2013.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Czechia,CZE,CZE_2013_2021,2013.0,2021.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Ecuador,ECU,ECU_2007_2013,2007.0,2013.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Egypt,EGY,EGY_2013_2014,2013.0,2014.0,3.0,0.0,2013.0,2014.0,coup,onset_matches_ert
+El Salvador,SLV,SLV_2018_2025,2018.0,2025.0,1.0,1.0,2019.0,2024.0,backsliding,onset_within_2yr
+Fiji,FJI,FJI_2000_2001,2000.0,2001.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Fiji,FJI,FJI_2006_2007,2006.0,2007.0,3.0,0.0,2006.0,2007.0,coup,onset_matches_ert
 Gabon,GAB,GAB_2018_2024,2018.0,2024.0,3.0,0.0,2023.0,2024.0,coup,onset_differs
 Georgia,GEO,GEO_2017_2025,2017.0,2025.0,1.0,1.0,2024.0,2025.0,backsliding,onset_differs
-Ghana,GHA,GHA_2013_2021,2013.0,2021.0,2.0,0.0,,,,ert_only
-Greece,GRC,GRC_2020_2025,2020.0,2025.0,4.0,1.0,2020.0,2024.0,backsliding,matched
-Guatemala,GTM,GTM_2018_2022,2018.0,2022.0,2.0,0.0,,,,ert_only
+Ghana,GHA,GHA_2013_2021,2013.0,2021.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Greece,GRC,GRC_2020_2025,2020.0,2025.0,4.0,1.0,2020.0,2024.0,backsliding,onset_matches_ert
+Guatemala,GTM,GTM_2018_2022,2018.0,2022.0,2.0,0.0,,,,in_ert_absent_from_paper_set
 Guinea,GIN,GIN_2019_2025,2019.0,2025.0,3.0,1.0,2009.0,2010.0,coup,onset_differs
-Guinea-Bissau,GNB,GNB_2012_2013,2012.0,2013.0,3.0,0.0,2012.0,2013.0,coup,matched
-Guinea-Bissau,GNB,GNB_2022_2022,2022.0,2022.0,1.0,0.0,2012.0,2013.0,coup,onset_differs
-Guinea-Bissau,GNB,GNB_2024_2025,2024.0,2025.0,3.0,1.0,2012.0,2013.0,coup,onset_differs
-Guyana,GUY,GUY_2019_2025,2019.0,2025.0,4.0,1.0,2021.0,2023.0,backsliding,onset_differs
-Haiti,HTI,HTI_2001_2004,2001.0,2004.0,3.0,0.0,2022.0,2024.0,coup,onset_differs
-Haiti,HTI,HTI_2020_2025,2020.0,2025.0,3.0,1.0,2022.0,2024.0,coup,onset_differs
+Guinea-Bissau,GNB,GNB_2012_2013,2012.0,2013.0,3.0,0.0,2012.0,2013.0,coup,onset_matches_ert
+Guinea-Bissau,GNB,GNB_2022_2022,2022.0,2022.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Guinea-Bissau,GNB,GNB_2024_2025,2024.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
+Guyana,GUY,GUY_2019_2025,2019.0,2025.0,4.0,1.0,2021.0,2023.0,backsliding,onset_within_2yr
+Haiti,HTI,HTI_2001_2004,2001.0,2004.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Haiti,HTI,HTI_2020_2025,2020.0,2025.0,3.0,1.0,2022.0,2024.0,coup,onset_within_2yr
 Honduras,HND,HND_2006_2010,2006.0,2010.0,1.0,0.0,2009.0,2010.0,coup,onset_differs
-Hong Kong,HKG,HKG_2016_2025,2016.0,2025.0,3.0,1.0,,,,ert_only
+Hong Kong,HKG,HKG_2016_2025,2016.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
 Hungary,HUN,HUN_2006_2025,2006.0,2025.0,1.0,1.0,2010.0,2018.0,backsliding,onset_differs
 India,IND,IND_2009_2025,2009.0,2025.0,1.0,1.0,2014.0,2024.0,backsliding,onset_differs
 Indonesia,IDN,IDN_2009_2025,2009.0,2025.0,1.0,1.0,2024.0,2025.0,backsliding,onset_differs
-Italy,ITA,ITA_2019_2025,2019.0,2025.0,4.0,1.0,,,,ert_only
-Ivory Coast,CIV,CIV_2000_2000,2000.0,2000.0,3.0,0.0,2020.0,2022.0,backsliding,onset_differs
-Ivory Coast,CIV,CIV_2020_2025,2020.0,2025.0,1.0,1.0,2020.0,2022.0,backsliding,matched
-Kenya,,,,,,,2007.0,2008.0,backsliding,paper_addition
-Kuwait,KWT,KWT_2021_2025,2021.0,2025.0,3.0,1.0,,,,ert_only
-Kyrgyzstan,KGZ,KGZ_2019_2025,2019.0,2025.0,3.0,1.0,,,,ert_only
-Lebanon,LBN,LBN_2018_2024,2018.0,2024.0,3.0,0.0,,,,ert_only
-Lesotho,LSO,LSO_2015_2017,2015.0,2017.0,2.0,0.0,,,,ert_only
-Liberia,LBR,LBR_2003_2004,2003.0,2004.0,3.0,0.0,,,,ert_only
-Libya,LBY,LBY_2014_2025,2014.0,2025.0,3.0,1.0,2014.0,2015.0,coup,matched
-Madagascar,MDG,MDG_1997_2002,1997.0,2002.0,1.0,0.0,,,,ert_only
-Madagascar,MDG,MDG_2009_2010,2009.0,2010.0,3.0,0.0,,,,ert_only
-Madagascar,MDG,MDG_2023_2025,2023.0,2025.0,3.0,1.0,,,,ert_only
-Malawi,MWI,MWI_1999_2005,1999.0,2005.0,1.0,0.0,,,,ert_only
+Italy,ITA,ITA_2019_2025,2019.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Ivory Coast,CIV,CIV_2000_2000,2000.0,2000.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Ivory Coast,CIV,CIV_2020_2025,2020.0,2025.0,1.0,1.0,2020.0,2022.0,backsliding,onset_matches_ert
+Kenya,,,,,,,2007.0,2008.0,backsliding,paper_addition_not_in_ert
+Kuwait,KWT,KWT_2021_2025,2021.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
+Kyrgyzstan,KGZ,KGZ_2019_2025,2019.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
+Lebanon,LBN,LBN_2018_2024,2018.0,2024.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Lesotho,LSO,LSO_2015_2017,2015.0,2017.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Liberia,LBR,LBR_2003_2004,2003.0,2004.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Libya,LBY,LBY_2014_2025,2014.0,2025.0,3.0,1.0,2014.0,2015.0,coup,onset_matches_ert
+Madagascar,MDG,MDG_1997_2002,1997.0,2002.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Madagascar,MDG,MDG_2009_2010,2009.0,2010.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Madagascar,MDG,MDG_2023_2025,2023.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
+Malawi,MWI,MWI_1999_2005,1999.0,2005.0,1.0,0.0,,,,in_ert_absent_from_paper_set
 Maldives,MDV,MDV_2010_2017,2010.0,2017.0,1.0,0.0,2013.0,2017.0,backsliding,onset_differs
-Mali,MLI,MLI_2008_2013,2008.0,2013.0,1.0,0.0,2020.0,2021.0,coup,onset_differs
-Mali,MLI,MLI_2018_2025,2018.0,2025.0,3.0,1.0,2020.0,2021.0,coup,onset_differs
-Mauritania,MRT,MRT_2013_2025,2013.0,2025.0,3.0,1.0,,,,ert_only
+Mali,MLI,MLI_2008_2013,2008.0,2013.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Mali,MLI,MLI_2018_2025,2018.0,2025.0,3.0,1.0,2020.0,2021.0,coup,onset_within_2yr
+Mauritania,MRT,MRT_2013_2025,2013.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
 Mauritius,MUS,MUS_2014_2023,2014.0,2023.0,1.0,0.0,2017.0,2023.0,backsliding,onset_differs
 Mexico,MEX,MEX_2020_2025,2020.0,2025.0,1.0,1.0,2024.0,2025.0,backsliding,onset_differs
-Moldova,MDA,MDA_1998_2006,1998.0,2006.0,1.0,0.0,,,,ert_only
-Moldova,MDA,MDA_2013_2017,2013.0,2017.0,2.0,0.0,,,,ert_only
-Moldova,MDA,MDA_2023_2025,2023.0,2025.0,4.0,1.0,,,,ert_only
+Moldova,MDA,MDA_1998_2006,1998.0,2006.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Moldova,MDA,MDA_2013_2017,2013.0,2017.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Moldova,MDA,MDA_2023_2025,2023.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
 Mongolia,MNG,MNG_2016_2024,2016.0,2024.0,1.0,0.0,2024.0,2025.0,backsliding,onset_differs
-Montenegro,,,,,,,2007.0,2020.0,backsliding,paper_addition
-Mozambique,MOZ,MOZ_2017_2025,2017.0,2025.0,3.0,1.0,,,,ert_only
-Nepal,NPL,NPL_2000_2003,2000.0,2003.0,3.0,0.0,,,,ert_only
-Nepal,NPL,NPL_2012_2013,2012.0,2013.0,3.0,0.0,,,,ert_only
+Montenegro,,,,,,,2007.0,2020.0,backsliding,paper_addition_not_in_ert
+Mozambique,MOZ,MOZ_2017_2025,2017.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
+Nepal,NPL,NPL_2000_2003,2000.0,2003.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Nepal,NPL,NPL_2012_2013,2012.0,2013.0,3.0,0.0,,,,in_ert_absent_from_paper_set
 Nicaragua,NIC,NIC_1996_2025,1996.0,2025.0,1.0,1.0,2007.0,2021.0,backsliding,onset_differs
-Niger,NER,NER_1996_1996,1996.0,1996.0,1.0,0.0,2009.0,2010.0,coup,onset_differs
-Niger,NER,NER_1999_1999,1999.0,1999.0,3.0,0.0,2009.0,2010.0,coup,onset_differs
-Niger,NER,NER_2009_2010,2009.0,2010.0,1.0,0.0,2009.0,2010.0,coup,matched
-Niger,NER,NER_2015_2025,2015.0,2025.0,1.0,1.0,2009.0,2010.0,coup,onset_differs
-Nigeria,,,,,,,2021.0,2024.0,backsliding,paper_addition
+Niger,NER,NER_1996_1996,1996.0,1996.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Niger,NER,NER_1999_1999,1999.0,1999.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Niger,NER,NER_2009_2010,2009.0,2010.0,1.0,0.0,2009.0,2010.0,coup,onset_matches_ert
+Niger,NER,NER_2015_2025,2015.0,2025.0,1.0,1.0,,,,in_ert_absent_from_paper_set
+Nigeria,,,,,,,2021.0,2024.0,backsliding,paper_addition_not_in_ert
 North Macedonia,MKD,MKD_2000_2001,2000.0,2001.0,3.0,0.0,2011.0,2016.0,backsliding,onset_differs
-North Macedonia,MKD,MKD_2005_2012,2005.0,2012.0,1.0,0.0,2011.0,2016.0,backsliding,onset_differs
-Pakistan,PAK,PAK_1999_2000,1999.0,2000.0,3.0,0.0,,,,ert_only
-Pakistan,PAK,PAK_2015_2025,2015.0,2025.0,3.0,1.0,,,,ert_only
-Palestine/West Bank,PSE,PSE_2006_2008,2006.0,2008.0,1.0,0.0,,,,ert_only
-Papua New Guinea,PNG,PNG_2007_2013,2007.0,2013.0,1.0,0.0,,,,ert_only
-Peru,PER,PER_2016_2025,2016.0,2025.0,4.0,1.0,,,,ert_only
-Philippines,PHL,PHL_2001_2005,2001.0,2005.0,1.0,0.0,2016.0,2022.0,backsliding,onset_differs
-Philippines,PHL,PHL_2016_2025,2016.0,2025.0,1.0,1.0,2016.0,2022.0,backsliding,matched
-Poland,POL,POL_2016_2021,2016.0,2021.0,2.0,0.0,2015.0,2019.0,backsliding,onset_differs
-Romania,ROU,ROU_2021_2025,2021.0,2025.0,4.0,1.0,,,,ert_only
-Russia,,,,,,,2000.0,2012.0,backsliding,paper_addition
-Saudi Arabia,,,,,,,2017.0,2024.0,backsliding,paper_addition
-Senegal,SEN,SEN_2021_2025,2021.0,2025.0,4.0,1.0,,,,ert_only
-Serbia,SRB,SRB_2010_2025,2010.0,2025.0,1.0,1.0,2012.0,2020.0,backsliding,onset_differs
-Slovakia,SVK,SVK_2023_2025,2023.0,2025.0,4.0,1.0,,,,ert_only
-Slovenia,SVN,SVN_2012_2021,2012.0,2021.0,2.0,0.0,2021.0,2024.0,backsliding,onset_differs
-Slovenia,SVN,SVN_2023_2025,2023.0,2025.0,4.0,1.0,2021.0,2024.0,backsliding,onset_differs
-Solomon Islands,SLB,SLB_1998_2001,1998.0,2001.0,1.0,0.0,,,,ert_only
+North Macedonia,MKD,MKD_2005_2012,2005.0,2012.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Pakistan,PAK,PAK_1999_2000,1999.0,2000.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Pakistan,PAK,PAK_2015_2025,2015.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
+Palestine/West Bank,PSE,PSE_2006_2008,2006.0,2008.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Papua New Guinea,PNG,PNG_2007_2013,2007.0,2013.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Peru,PER,PER_2016_2025,2016.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Philippines,PHL,PHL_2001_2005,2001.0,2005.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Philippines,PHL,PHL_2016_2025,2016.0,2025.0,1.0,1.0,2016.0,2022.0,backsliding,onset_matches_ert
+Poland,POL,POL_2016_2021,2016.0,2021.0,2.0,0.0,2015.0,2019.0,backsliding,onset_within_2yr
+Romania,ROU,ROU_2021_2025,2021.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Russia,,,,,,,2000.0,2012.0,backsliding,paper_addition_not_in_ert
+Saudi Arabia,,,,,,,2017.0,2024.0,backsliding,paper_addition_not_in_ert
+Senegal,SEN,SEN_2021_2025,2021.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Serbia,SRB,SRB_2010_2025,2010.0,2025.0,1.0,1.0,2012.0,2020.0,backsliding,onset_within_2yr
+Slovakia,SVK,SVK_2023_2025,2023.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+Slovenia,SVN,SVN_2012_2021,2012.0,2021.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Slovenia,SVN,SVN_2023_2025,2023.0,2025.0,4.0,1.0,2021.0,2024.0,backsliding,onset_within_2yr
+Solomon Islands,SLB,SLB_1998_2001,1998.0,2001.0,1.0,0.0,,,,in_ert_absent_from_paper_set
 South Korea,KOR,KOR_2008_2014,2008.0,2014.0,2.0,0.0,2024.0,2025.0,backsliding,onset_differs
-South Korea,KOR,KOR_2019_2023,2019.0,2023.0,2.0,0.0,2024.0,2025.0,backsliding,onset_differs
-Sri Lanka,LKA,LKA_2004_2006,2004.0,2006.0,1.0,0.0,,,,ert_only
-Sudan,,,,,,,2021.0,2022.0,coup,paper_addition
-Tajikistan,,,,,,,2016.0,2024.0,backsliding,paper_addition
-Tanzania,TZA,TZA_2015_2021,2015.0,2021.0,3.0,0.0,,,,ert_only
-Thailand,THA,THA_2003_2007,2003.0,2007.0,1.0,0.0,2014.0,2014.0,coup,onset_differs
-Thailand,THA,THA_2013_2014,2013.0,2014.0,3.0,0.0,2014.0,2014.0,coup,onset_differs
-Togo,TGO,TGO_2017_2025,2017.0,2025.0,3.0,1.0,,,,ert_only
+South Korea,KOR,KOR_2019_2023,2019.0,2023.0,2.0,0.0,,,,in_ert_absent_from_paper_set
+Sri Lanka,LKA,LKA_2004_2006,2004.0,2006.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Sudan,,,,,,,2021.0,2022.0,coup,paper_addition_not_in_ert
+Tajikistan,,,,,,,2016.0,2024.0,backsliding,paper_addition_not_in_ert
+Tanzania,TZA,TZA_2015_2021,2015.0,2021.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Thailand,THA,THA_2003_2007,2003.0,2007.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Thailand,THA,THA_2013_2014,2013.0,2014.0,3.0,0.0,2014.0,2014.0,coup,onset_within_2yr
+Togo,TGO,TGO_2017_2025,2017.0,2025.0,3.0,1.0,,,,in_ert_absent_from_paper_set
 Tunisia,TUN,TUN_2014_2022,2014.0,2022.0,1.0,0.0,2021.0,2023.0,backsliding,onset_differs
 Türkiye,TUR,TUR_2005_2017,2005.0,2017.0,1.0,0.0,2013.0,2017.0,backsliding,onset_differs
-Uganda,,,,,,,2017.0,2024.0,backsliding,paper_addition
-Ukraine,UKR,UKR_1997_2000,1997.0,2000.0,1.0,0.0,2010.0,2013.0,backsliding,onset_differs
-Ukraine,UKR,UKR_2010_2014,2010.0,2014.0,1.0,0.0,2010.0,2013.0,backsliding,matched
-Ukraine,UKR,UKR_2021_2025,2021.0,2025.0,4.0,1.0,2010.0,2013.0,backsliding,onset_differs
-United Kingdom,GBR,GBR_2019_2025,2019.0,2025.0,4.0,1.0,,,,ert_only
-United States of America,USA,USA_2024_2025,2024.0,2025.0,4.0,1.0,,,,ert_only
+Uganda,,,,,,,2017.0,2024.0,backsliding,paper_addition_not_in_ert
+Ukraine,UKR,UKR_1997_2000,1997.0,2000.0,1.0,0.0,,,,in_ert_absent_from_paper_set
+Ukraine,UKR,UKR_2010_2014,2010.0,2014.0,1.0,0.0,2010.0,2013.0,backsliding,onset_matches_ert
+Ukraine,UKR,UKR_2021_2025,2021.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+United Kingdom,GBR,GBR_2019_2025,2019.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
+United States of America,USA,USA_2024_2025,2024.0,2025.0,4.0,1.0,,,,in_ert_absent_from_paper_set
 Venezuela,VEN,VEN_1998_2018,1998.0,2018.0,1.0,0.0,2002.0,2013.0,backsliding,onset_differs
-Yemen,YEM,YEM_2013_2016,2013.0,2016.0,3.0,0.0,,,,ert_only
-Zambia,ZMB,ZMB_2011_2019,2011.0,2019.0,1.0,0.0,2013.0,2020.0,backsliding,onset_differs
+Yemen,YEM,YEM_2013_2016,2013.0,2016.0,3.0,0.0,,,,in_ert_absent_from_paper_set
+Zambia,ZMB,ZMB_2011_2019,2011.0,2019.0,1.0,0.0,2013.0,2020.0,backsliding,onset_within_2yr

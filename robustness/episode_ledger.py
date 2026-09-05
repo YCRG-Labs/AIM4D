@@ -19,12 +19,25 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 OUT = os.path.dirname(os.path.abspath(__file__))
+# ERT v16, vendored so the ledger does not depend on a path outside the repo.
+# Source: https://github.com/vdeminstitute/ERT (release v16), file inst/ert.csv
 ERT = os.environ.get("AIM4D_ERT_CSV",
-                     "/Users/jacobcrainic/.claude/jobs/7ba88e0e/tmp/ERT-master/inst/ert.csv")
+                     os.path.join(os.path.dirname(__file__), "..", "data", "ert_v16", "ert.csv"))
+ERT_SHA256 = "26e805df073a26973f5c0fbefdcdd0d20776245d71092a575063e47ffac6db5f"
+
+
+def _check_source(path):
+    import hashlib
+    h = hashlib.sha256(open(path, "rb").read()).hexdigest()
+    if h != ERT_SHA256:
+        raise SystemExit("ERT source checksum mismatch: expected "
+                         + ERT_SHA256 + ", got " + h)
+    return h
 FIRST_YEAR = 1996
 
 
 def ert_episodes():
+    _check_source(ERT)
     d = pd.read_csv(ERT, low_memory=False)
     e = d[d["aut_ep"] == 1]
     ep = (e.groupby(["country_name", "country_text_id", "aut_ep_id"])
@@ -65,11 +78,35 @@ def main():
                      "end": int(row["end"]),
                      "status": "onset_matches_ert" if len(exact)
                      else ("onset_within_2yr" if len(near) else "onset_differs")})
+    # Carry the full ERT record onto every matched row. Building the matched rows
+    # from the paper's entry alone would leave country_text_id, outcome and the
+    # censoring flag empty exactly where the reconciliation is most informative.
     rec_df = pd.DataFrame(recs)
+    keep = ["aut_ep_id", "country_text_id", "outcome", "censored", "end"]
+    rec_df = rec_df.drop(columns=[c for c in keep if c in rec_df.columns and c != "aut_ep_id"],
+                         errors="ignore")
+    rec_df = rec_df.merge(ep[keep], on="aut_ep_id", how="left")
     used = set(rec_df["aut_ep_id"]) - {""}
     extra = ep[~ep["aut_ep_id"].isin(used)].copy()
     extra["status"] = "in_ert_absent_from_paper_set"
     m = pd.concat([rec_df, extra], ignore_index=True)
+
+    cols = [c for c in ["country_name", "country_text_id", "aut_ep_id", "onset", "end",
+                        "outcome", "censored", "paper_onset", "paper_peak", "paper_type",
+                        "status"] if c in m.columns]
+    m = m[cols].sort_values(["country_name", "onset"], na_position="last")
+    dest = os.path.join(OUT, "episode_ledger.csv")
+    m.to_csv(dest, index=False)
+
+    # Assertions, because the previous version printed a success message while
+    # writing nothing and left a stale country-level merge on disk.
+    back = pd.read_csv(dest)
+    assert len(back) == len(m), "ledger did not round-trip"
+    dup = back[back["aut_ep_id"].notna()]["aut_ep_id"]
+    assert dup.is_unique, f"episode ids repeat in the ledger: {dup[dup.duplicated()].tolist()[:5]}"
+    assert set(back["status"]) <= {"onset_matches_ert", "onset_within_2yr", "onset_differs",
+                                   "paper_addition_not_in_ert", "in_ert_absent_from_paper_set"}
+    print(f"ledger written and verified: {len(back)} rows, episode ids unique")
 
     print(f"ERT autocratization episodes with onset >= {FIRST_YEAR}: {len(ep)} "
           f"across {ep.country_name.nunique()} countries")

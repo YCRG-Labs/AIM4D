@@ -64,8 +64,16 @@ therefore **registered as of this amendment, 2026-09-06, not 2026-05-17**:
   evaluated countries and the realized magnitude of democratic decline across
   2026-2031.
 
-Both are stated before any outcome is observed, which is what makes them
-falsifiable, but they carry the later date and should be reported as such. The
+Both carry the later date and must be reported as such. The date deserves
+precision rather than the phrase "before any outcome is observed", which would
+be false: 2026-09-06 falls *inside* the 2026-2031 window, not before it. What
+is true is narrower. None of the sources the registration names had published
+coding for 2026 at that date, and no outcome data were consulted in setting
+these criteria. That is absence of finalized annual coding, not absence of
+knowledge of events in the first eight months of 2026, and we do not claim the
+latter. Five of the window's six years lay entirely in the future; the sixth did
+not. Criterion (A) is therefore weaker on timing grounds than the registered
+list itself, which was locked in May 2026 before the window opened. The
 manuscript's power analysis for criterion (A) applies: on nine candidates the
 bar is cleared by two onsets, which under a true precision of 0.17 occurs by
 chance with probability 0.47, so clearing it is weak evidence of skill.

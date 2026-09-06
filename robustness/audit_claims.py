@@ -21,7 +21,7 @@ import pandas as pd
 
 REPO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 ROB = os.path.join(REPO, "robustness")
-TEX = os.path.expanduser("~/Downloads/fullpaper (2).tex")
+TEX = os.environ.get("AIM4D_TEX", os.path.expanduser("~/aim4d-paper/fullpaper.tex"))
 
 TEXT = open(TEX, encoding="utf-8").read()
 

@@ -1,5 +1,5 @@
 dimension,from,to,n_pairs,mean_dauc,min,max
-risk_set,all,at-risk,24,0.0179,-0.0748,0.071
-label,future-only,window,24,0.0021,-0.031,0.0333
-origin,fixed-2019,rolling,24,-0.0884,-0.2447,0.0776
-closure,enforced,none,24,0.1382,0.0049,0.2071
+risk_set,all,at-risk,24,0.0242,-0.0567,0.0715
+label,future-only,window,24,0.0038,-0.0326,0.0331
+origin,fixed-2019,rolling,24,-0.0836,-0.208,0.0643
+closure,enforced,none,24,0.1419,0.0099,0.2092

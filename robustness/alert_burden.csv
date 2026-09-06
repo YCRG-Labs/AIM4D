@@ -1,13 +1,13 @@
 scope,tier,threshold,negative_country_years,false_alerts,false_alert_rate,years_covered,mean_countries_flagged_per_year
-all eligible country-years,watch,0.1225,3109,789,0.2538,26,30.35
-all eligible country-years,warning,0.1761,3109,255,0.082,26,9.81
-all eligible country-years,alert,0.2086,3109,116,0.0373,26,4.46
-out-of-sample 2020-2025,watch,0.1225,682,303,0.4443,6,50.5
-out-of-sample 2020-2025,warning,0.1761,682,133,0.195,6,22.17
-out-of-sample 2020-2025,alert,0.2086,682,67,0.0982,6,11.17
-consolidated democracies,watch,0.1225,260,2,0.0077,26,0.08
-consolidated democracies,warning,0.1761,260,0,0.0,26,0.0
-consolidated democracies,alert,0.2086,260,0,0.0,26,0.0
-"consolidated democracies, 2020-2025",watch,0.1225,60,2,0.0333,6,0.33
-"consolidated democracies, 2020-2025",warning,0.1761,60,0,0.0,6,0.0
-"consolidated democracies, 2020-2025",alert,0.2086,60,0,0.0,6,0.0
+all eligible country-years,watch,0.1229,3109,788,0.2535,26,30.31
+all eligible country-years,warning,0.1765,3109,250,0.0804,26,9.62
+all eligible country-years,alert,0.2096,3109,122,0.0392,26,4.69
+out-of-sample 2020-2025,watch,0.1229,682,302,0.4428,6,50.33
+out-of-sample 2020-2025,warning,0.1765,682,128,0.1877,6,21.33
+out-of-sample 2020-2025,alert,0.2096,682,73,0.107,6,12.17
+consolidated democracies,watch,0.1229,260,1,0.0038,26,0.04
+consolidated democracies,warning,0.1765,260,0,0.0,26,0.0
+consolidated democracies,alert,0.2096,260,0,0.0,26,0.0
+"consolidated democracies, 2020-2025",watch,0.1229,60,1,0.0167,6,0.17
+"consolidated democracies, 2020-2025",warning,0.1765,60,0,0.0,6,0.0
+"consolidated democracies, 2020-2025",alert,0.2096,60,0,0.0,6,0.0

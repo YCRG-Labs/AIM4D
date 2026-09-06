@@ -1,6 +1,6 @@
 model,n,n_pos,base_rate,auc_roc,auc_pr,auc_roc_lo,auc_roc_hi,auc_pr_lo,auc_pr_hi
-end_to_end,535,109,0.2037,0.662,0.2953,,,,
-shared_representation,535,109,0.2037,0.6801,0.3226,,,,
+end_to_end,535,109,0.2037,0.6584,0.2927,,,,
+shared_representation,535,109,0.2037,0.6736,0.3181,,,,
 four_polyarchy,535,109,0.2037,0.6384,0.2976,,,,
-end_to_end_minus_shared,535,109,0.2037,-0.0181,-0.0303,-0.0559,0.0176,-0.0773,0.0013
-end_to_end_minus_four_polyarchy,535,109,0.2037,0.0245,-0.004,-0.0335,0.0875,-0.0797,0.0692
+end_to_end_minus_shared,535,109,0.2037,-0.0154,-0.0302,-0.0502,0.0186,-0.0855,0.0075
+end_to_end_minus_four_polyarchy,535,109,0.2037,0.0209,-0.0081,-0.0414,0.0875,-0.0839,0.0633

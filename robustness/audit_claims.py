@@ -52,8 +52,8 @@ def csv(name, sub=ROB):
 
 
 cv = csv("expanding_window_cv.csv")
-check("C1", "refit CV mean AUC", 0.821, round(cv["auc"].mean(), 3), in_tex="0.821")
-check("C1", "refit CV mean AP", 0.524, round(cv["ap"].mean(), 3), in_tex="0.524")
+check("C1", "refit CV mean AUC", 0.817, round(cv["auc"].mean(), 3), in_tex="0.817")
+check("C1", "refit CV mean AP", 0.541, round(cv["ap"].mean(), 3), in_tex="0.541")
 
 b = csv("bootstrap_cis.csv").set_index("metric")
 for cid, metric, rep, lo, hi, tx in [
@@ -278,17 +278,17 @@ check("C27", "e2e positives", 88, int(m27.y.sum()), kind="exact", in_tex="88 pos
 
 # C28 end-to-end, ERT outcome
 c28 = csv("strict_endtoend_ert_comparison.csv").set_index("model")
-check("C28", "ERT e2e AUC", 0.662, round(float(c28.loc["end_to_end", "auc_roc"]), 3), in_tex="0.662")
-check("C28", "ERT e2e AP", 0.295, round(float(c28.loc["end_to_end", "auc_pr"]), 3), in_tex="0.295")
-check("C28", "ERT shared-rep AUC", 0.680, round(float(c28.loc["shared_representation", "auc_roc"]), 3))
-check("C28", "ERT shared-rep AP", 0.323, round(float(c28.loc["shared_representation", "auc_pr"]), 3), in_tex="0.323")
+check("C28", "ERT e2e AUC", 0.658, round(float(c28.loc["end_to_end", "auc_roc"]), 3), in_tex="0.658")
+check("C28", "ERT e2e AP", 0.293, round(float(c28.loc["end_to_end", "auc_pr"]), 3), in_tex="0.293")
+check("C28", "ERT shared-rep AUC", 0.674, round(float(c28.loc["shared_representation", "auc_roc"]), 3))
+check("C28", "ERT shared-rep AP", 0.318, round(float(c28.loc["shared_representation", "auc_pr"]), 3), in_tex="0.318")
 check("C28", "ERT four-var AUC", 0.638, round(float(c28.loc["four_polyarchy", "auc_roc"]), 3), in_tex="0.638")
-check("C28", "ERT e2e minus shared, point", -0.018, round(float(c28.loc["end_to_end_minus_shared", "auc_roc"]), 3), in_tex="-0.018")
-check("C28", "ERT e2e minus shared, CI lo", -0.056, round(float(c28.loc["end_to_end_minus_shared", "auc_roc_lo"]), 3), tol=0.01, in_tex="[-0.056, +0.018]")
-check("C28", "ERT e2e minus shared, CI hi", 0.018, round(float(c28.loc["end_to_end_minus_shared", "auc_roc_hi"]), 3), tol=0.01)
-check("C28", "ERT e2e minus four-var, point", 0.025, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc"]), 3), in_tex="+0.025")
-check("C28", "ERT e2e minus four-var, CI lo", -0.034, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc_lo"]), 3), tol=0.01, in_tex="[-0.034, +0.087]")
-check("C28", "ERT e2e minus four-var, CI hi", 0.087, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc_hi"]), 3), tol=0.01)
+check("C28", "ERT e2e minus shared, point", -0.015, round(float(c28.loc["end_to_end_minus_shared", "auc_roc"]), 3), in_tex="-0.015")
+check("C28", "ERT e2e minus shared, CI lo", -0.050, round(float(c28.loc["end_to_end_minus_shared", "auc_roc_lo"]), 3), tol=0.01, in_tex="[-0.050, +0.019]")
+check("C28", "ERT e2e minus shared, CI hi", 0.019, round(float(c28.loc["end_to_end_minus_shared", "auc_roc_hi"]), 3), tol=0.01)
+check("C28", "ERT e2e minus four-var, point", 0.021, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc"]), 3), in_tex="+0.021")
+check("C28", "ERT e2e minus four-var, CI lo", -0.041, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc_lo"]), 3), tol=0.01, in_tex="[-0.041, +0.088]")
+check("C28", "ERT e2e minus four-var, CI hi", 0.088, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc_hi"]), 3), tol=0.01)
 check("C28", "ERT e2e rows", 535, int(c28.loc["end_to_end", "n"]), kind="exact", in_tex="535")
 
 

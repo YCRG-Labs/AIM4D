@@ -443,3 +443,25 @@ claims:
     last_verified_on: 2026-09-06T00:00:00Z
     last_verified_by: "/referee2 round 1 (audit_claims.py C-block)"
     status: PASS
+
+  - id: C35
+    claim: "Closure placebo, 50 permutations, symmetric seeds: observed contrast -0.191; placebo mean -0.303, sd 0.038; 50 of 50 more negative"
+    location: "fullpaper.tex:Section 5.2"
+    source_file: robustness/closure_placebo.py
+    output_file: robustness/closure_placebo.csv
+    output_field: "mean_contrast by kind"
+    tolerance: {point_estimate: 0.002}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "/referee2 round 1"
+    status: PASS
+
+  - id: C36
+    claim: "Size-matched closure arm: closed minus open -0.193, closed minus open_matched -0.154, so four-fifths of the closure effect is label memorization"
+    location: "fullpaper.tex:Section 5.2 + Section 8.1"
+    source_file: code/replication/referee2_closure_sizematch.py
+    output_file: code/replication/referee2_closure_sizematch.csv
+    output_field: "closed_minus_open, closed_minus_open_matched (mean over 9 learner x seed)"
+    tolerance: {point_estimate: 0.002}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "/referee2 round 1"
+    status: PASS

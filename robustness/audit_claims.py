@@ -366,6 +366,16 @@ for h, blk, mean, lo_r, hi_r in [(5, "mob", 0.004, -0.018, 0.025), (2, "mob", 0.
     check("C34", f"ERT {blk} h={h} CI lo", lo_r, round(float(r.d_auc_lo), 3), tol=0.002)
     check("C34", f"ERT {blk} h={h} CI hi", hi_r, round(float(r.d_auc_hi), 3), tol=0.002)
 
+
+# C35 placebo, C36 size-matched arm (referee2 round 1)
+_pl = csv("closure_placebo.csv"); _obs = float(_pl[_pl.kind == "observed"].mean_contrast.iloc[0]); _pp = _pl[_pl.kind == "placebo"].mean_contrast
+check("C35", "placebo observed closure contrast", -0.191, round(_obs, 3), tol=0.002, in_tex="-0.191")
+check("C35", "placebo mean", -0.303, round(float(_pp.mean()), 3), tol=0.002, in_tex="-0.303")
+check("C35", "placebo sd", 0.038, round(float(_pp.std()), 3), tol=0.002, in_tex="0.038")
+check("C35", "placebo n more negative", 50, int((_pp <= _obs).sum()), kind="exact", in_tex="every one of the fifty")
+_sm = pd.read_csv(os.path.join(REPO, "code", "replication", "referee2_closure_sizematch.csv"))
+check("C36", "size-match closed minus open", -0.193, round(float(_sm.closed_minus_open.mean()), 3), tol=0.002, in_tex="-0.193")
+check("C36", "size-match closed minus open_matched", -0.154, round(float(_sm.closed_minus_open_matched.mean()), 3), tol=0.002, in_tex="-0.154")
 out = pd.DataFrame(rows)
 out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())

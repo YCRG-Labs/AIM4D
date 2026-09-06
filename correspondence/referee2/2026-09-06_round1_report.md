@@ -264,3 +264,19 @@ The paper's contribution is a measurement of how much of an autocratization fore
 ### Verdict under Edmans
 
 Contribution: strong for the design paper, weak for the framework paper. Execution: careful, unusually well falsified (placebo, factorial, era split, two outcomes, end-to-end rebuild), with the specification issues above being real but second-order. Exposition: honest, over-long, and structurally still carrying a paper it has disowned. Major revision: cut to the design paper.
+
+---
+
+## Round 1 follow-up: fixes applied and what they changed (2026-09-06, same day)
+
+The author-side editor applied the Stage 4 and SDEM fixes recommended above and retrained. Findings from that pass:
+
+**New finding, HIGH (reproducibility).** `stage5_ews/estimate.py` draws from the global numpy RNG in the critical-slowing-down surrogate generator (`np.random.normal`, lines 285 and 287) and set no numpy seed anywhere; only sklearn estimators carried `random_state`. Two identical-code runs of Stage 5 therefore produced different `eig_trend_sig`, `xcorr_trend_sig`, `mv_csd_alert` and downstream alert-tier columns (correlations 0.64-0.89 between runs on those columns). Audit 4's "seeds are correct for every stochastic component" was wrong about Stage 5: it checked estimators, not the global RNG. Fixed by seeding at module level (`np.random.seed(42 + SEED_OFFSET)`); byte-identity across two seeded runs is being verified. Every downstream number in the paper was, until this fix, reproducible only to the extent the CSD channel happened not to matter, which the paper's own stage ablation says it mostly does not.
+
+**Stage 4 retrain (causal temporal edges, `EXCLUDE_COUNTRY` in `mask_train`, econ-similarity on raw GDP).** The 2025 contagion scores correlate 0.996 with the previous run (mean |diff| 0.0095); `network_exposure` as seen by Stage 5 correlates 0.998. The learned edge weights reordered: cultural 0.282, alliance 0.260, contiguity 0.243, econ 0.215, against the previous 0.26 / 0.25 / 0.27 / 0.22, so the manuscript's "contiguity marginally dominant" became "cultural marginally dominant" (Section 5.6 updated). Table 5 Panel A on the retrained features: framework 0.680 -> 0.678, gradient boosting 0.674 -> 0.667, elastic net 0.654 -> 0.652, random forest 0.715 -> 0.716; four polyarchy variables and persistence unchanged, as they consume no pipeline features. Paired framework-minus-four-variables -0.038 -> -0.040, interval [-0.116, +0.035]. The substantive conclusions are untouched; the third decimals are not, and the full cascade of ~23 passport-backing scripts is being rerun so every reported number matches the corrected pipeline (`run_cascade_post_stage4.sh`).
+
+**SDEM bootstrap regenerated from its own fit (1b.3).** Lambda and rho intervals moved by bootstrap noise only. The neighbor-covariate intervals, previously centered at zero by construction, now read: y_lag [-0.003, +0.013], gdp_pc [-0.005, +0.006], urbanization [-0.007, +0.006], **trade_openness -0.0068 [-0.0131, -0.0002]**. One of the four contextual effects excludes zero. Appendix C.7's "supports nothing about contextual effects" was therefore an artifact of the mis-centered bootstrap and has been corrected in the manuscript.
+
+**`closure_placebo.py`** now uses identical seed sets for the observed statistic and every placebo draw, N_PERM defaults to 100, and the summary reports k of n. Rerun is in the cascade.
+
+**Status of the major concerns after this pass:** 1 (Stage 4 code) fixed and retrained, network sections being regenerated; 2 (SDEM) fixed and regenerated; 3 (hand-typed tables/figures) unchanged; 4 (replication package) partially addressed by `run_cascade_post_stage4.sh` and the tracked `quality_reports/`, README and pinning still open.

@@ -89,6 +89,19 @@ def rolling(d, feats, mk):
     return pd.concat(rows, ignore_index=True)
 
 
+def persistence(d, ORIGINS, H):
+    """3-year polyarchy decline, the same trend-extrapolation rung as Table 5 Panel A."""
+    rows = []
+    for T in ORIGINS:
+        te = d[(d.year == T) & d.at_risk]
+        if len(te) == 0 or "poly_d3" not in te.columns:
+            continue
+        rows.append(pd.DataFrame({"year": T, "country_name": te.country_name.values,
+                                  "y": te[f"y{H}"].values,
+                                  "p": -te["poly_d3"].fillna(0).values}))
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
 def main():
     d, ep = build_panel_ert()
     d = add_pitf(d)
@@ -141,9 +154,17 @@ def main():
         return q(aa), q(bb)
 
     rows = []
-    for name, df in [("Four polyarchy variables", p4), ("Five-stage framework", b),
+    pers_df = persistence(d, ORIGINS, H)
+    common = set(map(tuple, b[["country_name", "year"]].values.tolist()))
+    if len(pers_df):
+        keep = [tuple(r) for r in pers_df[["country_name", "year"]].values.tolist()]
+        pers_df = pers_df[[k in common for k in keep]].reset_index(drop=True)
+    for name, df in [("Persistence (3-yr polyarchy decline)", pers_df),
+                     ("Four polyarchy variables", p4), ("Five-stage framework", b),
                      ("Gradient boosting", parts["gb"]), ("Random forest", parts["rf"]),
                      ("Elastic net", parts["lr"])]:
+        if not len(df):
+            continue
         (alo, ahi), (plo, phi) = model_ci(df)
         rows.append({"model": name, "n": len(df), "n_pos": int(df.y.sum()),
                      "base_rate": round(df.y.mean(), 4),

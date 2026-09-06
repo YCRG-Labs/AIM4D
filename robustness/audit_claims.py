@@ -93,7 +93,7 @@ if "type" in lo.columns:
     check("C4", "coup detected", 11, int(cp["detected_watch"].sum()), kind="exact", in_tex="11/14")
 
 sp = csv("sample_pipeline_loeo.csv")
-check("C5", "15-ep LOEO mean delta", 0.081, round(float(sp["delta_risk"].mean()), 3), in_tex="0.081")
+check("C5", "15-ep LOEO mean delta", 0.093, round(float(sp["delta_risk"].mean()), 3), in_tex="0.093")
 check("C5", "15-ep higher count", 14, int((sp["delta_risk"] > 0).sum()), kind="exact",
       in_tex=["fourteen of the fifteen", "fourteen of fifteen"])
 

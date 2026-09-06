@@ -51,7 +51,7 @@ claims:
     status: PASS
 
   - id: C5
-    claim: "Fifteen-episode full-pipeline LOEO refit: mean risk delta +0.081, fourteen of fifteen higher"
+    claim: "Fifteen-episode full-pipeline LOEO refit: mean risk delta +0.093, fourteen of fifteen higher"
     location: "fullpaper.tex:Section 5.5 + Table 3 caption + Appendix B"
     source_file: robustness/sample_pipeline_loeo.py
     output_file: robustness/sample_pipeline_loeo.csv

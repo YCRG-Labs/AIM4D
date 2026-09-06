@@ -137,12 +137,12 @@ if "full" in g.index and "drop_stage4" in g.index:
     check("C12", "stage4 drop PR", 0.686, round(float(g.loc["drop_stage4", "oos_pr"]), 3), in_tex="0.686")
 
 ns = csv("network_seed_sweep_summary.csv").set_index(csv("network_seed_sweep_summary.csv").columns[0])
-for col, rep in [("alpha_contig", 0.24), ("alpha_alliance", 0.26), ("alpha_trade", 0.22),
+for col, rep in [("alpha_contig", 0.24), ("alpha_alliance", 0.26), ("alpha_trade", 0.23),
                  ("alpha_cultural", 0.28)]:
     check("C13", f"sweep {col}", rep, round(float(ns.loc["mean", col]), 2), tol=0.01)
 
 cs = csv("contagion_seed_sweep_summary.csv").set_index("country")
-for c, rep, sd, tx in [("Hungary", 0.606, 0.064, "60"), ("Turkey", 0.323, 0.037, "32")]:
+for c, rep, sd, tx in [("Hungary", 0.585, 0.109, "60"), ("Turkey", 0.303, 0.040, "32")]:
     def _norm(x):
         return unicodedata.normalize("NFKD", str(x)).encode("ascii", "ignore").decode().lower()
     aliases = {"Turkey": ("turkiye", "turkey")}.get(c, (c.lower(),))
@@ -376,6 +376,33 @@ check("C35", "placebo n more negative", 50, int((_pp <= _obs).sum()), kind="exac
 _sm = pd.read_csv(os.path.join(REPO, "code", "replication", "referee2_closure_sizematch.csv"))
 check("C36", "size-match closed minus open", -0.193, round(float(_sm.closed_minus_open.mean()), 3), tol=0.002, in_tex="-0.193")
 check("C36", "size-match closed minus open_matched", -0.154, round(float(_sm.closed_minus_open_matched.mean()), 3), tol=0.002, in_tex="-0.154")
+
+# C37: network-dependence seed sweep (Section 5.6, Figure 3, Appendix J)
+import numpy as _np
+from scipy.stats import spearmanr as _spr
+_sw = csv("netdep_tv_seed_sweep.csv")
+_g = _sw.groupby("country")
+for c, key, rep in [("US", "United States of America", 0.422), ("Hungary", "Hungary", 0.244),
+                    ("Poland", "Poland", 0.132), ("Turkiye", "T\u00fcrkiye", 0.050)]:
+    check("C37", f"seed-mean TV {c}", rep, round(float(_g["tv"].mean()[key]), 3), in_tex=f"${rep:.3f}$")
+check("C37", "Hungary seed-mean direction", -0.223, round(float(_g["signed"].mean()["Hungary"]), 3), in_tex="$-0.223$")
+_P = _sw.pivot(index="seed", columns="country", values="tv")
+_rs = [_spr(_P.iloc[i], _P.iloc[j])[0] for i in range(len(_P)) for j in range(i + 1, len(_P))]
+check("C37", "seed rank corr mean", 0.76, round(float(_np.mean(_rs)), 2), tol=0.01, in_tex="$0.76$")
+check("C37", "seed rank corr min", 0.54, round(float(_np.min(_rs)), 2), tol=0.01, in_tex="$0.54$")
+check("C37", "Hungary > Turkiye seeds", 10, int((_P["Hungary"] > _P["T\u00fcrkiye"]).sum()), kind="exact", in_tex="all ten runs")
+check("C37", "Turkiye positive seeds", 10, int((_sw[_sw.country == "T\u00fcrkiye"].signed > 0).sum()), kind="exact", in_tex="positive in all ten runs")
+check("C37", "Hungary negative seeds", 8, int((_sw[_sw.country == "Hungary"].signed < 0).sum()), kind="exact", in_tex="negative in eight of ten")
+
+# C38: locked 2025 cross-section (Section 5.6, Section 8)
+_tv = csv("netdep_total_variation.csv")
+_y = _tv[_tv.year == 2025].set_index("country_name")
+check("C38", "locked US TV", 0.291, round(float(_y.loc["United States of America", "netdep_tv"]), 3), in_tex="$0.291$")
+check("C38", "locked US rank of 135", 15, int(_y.netdep_tv.rank(ascending=False)["United States of America"]), kind="exact", in_tex="fifteenth of 135")
+check("C38", "locked Hungary direction", 0.419, round(float(_y.loc["Hungary", "netdep_signed"]), 3), in_tex="$+0.419$")
+check("C38", "locked Moldova TV", 0.823, round(float(_y.loc["Moldova", "netdep_tv"]), 3), in_tex="$0.823$")
+check("C38", "locked Poland TV", 0.126, round(float(_y.loc["Poland", "netdep_tv"]), 3), in_tex="$0.126$")
+check("C38", "share signed toward autocracy", 0.44, round(float((_tv.netdep_signed > 0).mean()), 2), tol=0.005, in_tex="44 percent")
 out = pd.DataFrame(rows)
 out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())

@@ -465,3 +465,25 @@ claims:
     last_verified_on: 2026-09-06T00:00:00Z
     last_verified_by: "/referee2 round 1"
     status: PASS
+
+  - id: C37
+    claim: "Network-dependence seed sweep: seed-mean TV US 0.422, Hungary 0.244, Poland 0.132, Turkiye 0.050; Hungary direction -0.223; seed rank correlations mean 0.76 min 0.54; Hungary > Turkiye 10/10; Turkiye positive 10/10; Hungary negative 8/10"
+    location: "fullpaper.tex:Section 5.6 + Figure 3 + Appendix J"
+    source_file: robustness/netdep_tv_seed_sweep.py
+    output_file: robustness/netdep_tv_seed_sweep.csv
+    output_field: "per-seed tv and signed, grouped by country"
+    tolerance: {point_estimate: 0.005, rank_corr: 0.01, counts: exact}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "post-stage4 cascade"
+    status: PASS
+
+  - id: C38
+    claim: "Locked 2025 cross-section: US TV 0.291 ranking fifteenth of 135, Hungary direction +0.419, Moldova 0.823, Poland 0.126; 44 percent of country-years signed toward autocracy"
+    location: "fullpaper.tex:Section 5.6 + Section 8"
+    source_file: robustness/netdep_total_variation.py
+    output_file: robustness/netdep_total_variation.csv
+    output_field: "netdep_tv, netdep_signed at year 2025; share of netdep_signed > 0 over all rows"
+    tolerance: {point_estimate: 0.005, share: 0.005, rank: exact}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "post-stage4 cascade"
+    status: PASS

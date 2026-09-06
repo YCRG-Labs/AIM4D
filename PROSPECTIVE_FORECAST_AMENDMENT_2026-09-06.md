@@ -72,8 +72,10 @@ coding for 2026 at that date, and no outcome data were consulted in setting
 these criteria. That is absence of finalized annual coding, not absence of
 knowledge of events in the first eight months of 2026, and we do not claim the
 latter. Five of the window's six years lay entirely in the future; the sixth did
-not. Criterion (A) is therefore weaker on timing grounds than the registered
-list itself, which was locked in May 2026 before the window opened. The
+not. Criterion (A) is weaker on timing grounds than the registered list itself
+only because it was fixed later in the same year: the list was locked on
+17 May 2026, itself inside the window's first year, so both the list and the
+criteria are forecasts of 2027-2031 with 2026 partly observed. The
 manuscript's power analysis for criterion (A) applies: on nine candidates the
 bar is cleared by two onsets, which under a true precision of 0.17 occurs by
 chance with probability 0.47, so clearing it is weak evidence of skill.

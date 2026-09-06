@@ -456,7 +456,7 @@ claims:
     status: PASS
 
   - id: C36
-    claim: "Size-matched closure arm: closed minus open -0.193, closed minus open_matched -0.154, so four-fifths of the closure effect is label memorization"
+    claim: "Size-matched closure arm: closed minus open -0.193, closed minus open_matched -0.154, so about four-fifths of the closure contrast remains after matching training-set sizes"
     location: "fullpaper.tex:Section 5.2 + Section 8.1"
     source_file: code/replication/referee2_closure_sizematch.py
     output_file: code/replication/referee2_closure_sizematch.csv

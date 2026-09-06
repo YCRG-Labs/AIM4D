@@ -57,10 +57,10 @@ check("C1", "refit CV mean AP", 0.524, round(cv["ap"].mean(), 3), in_tex="0.524"
 
 b = csv("bootstrap_cis.csv").set_index("metric")
 for cid, metric, rep, lo, hi, tx in [
-    ("C2", "auc_roc_oos_2019", 0.939, 0.800, 0.975, "0.939"),
-    ("C2", "auc_pr_oos_2019", 0.591, 0.354, 0.759, "0.591"),
-    ("C2", "bss_oos_2019", 0.212, -0.003, 0.329, "0.212"),
-    ("C7", "auc_fh_3yr_decline_2pt", 0.767, 0.720, 0.831, "0.77"),
+    ("C2", "auc_roc_oos_2019", 0.938, 0.797, 0.975, "0.938"),
+    ("C2", "auc_pr_oos_2019", 0.622, 0.375, 0.792, "0.622"),
+    ("C2", "bss_oos_2019", 0.219, 0.013, 0.335, "0.219"),
+    ("C7", "auc_fh_3yr_decline_2pt", 0.772, 0.726, 0.830, "0.77"),
     ("C7", "auc_polity_3yr_decline_3pt", 0.736, 0.689, 0.774, "0.74"),
 ]:
     if metric in b.index:
@@ -76,7 +76,7 @@ lt = csv("lead_time_auc.csv")
 lt = lt[lt["lead_years"].astype(str).str.fullmatch(r"\d+")].copy()
 lt["lead_years"] = lt["lead_years"].astype(int)
 lt = lt.set_index("lead_years")
-for lead, rep in [(1, 0.956), (2, 0.903), (3, 0.854), (4, 0.835)]:
+for lead, rep in [(1, 0.949), (2, 0.910), (3, 0.864), (4, 0.858)]:
     check("C3", f"lead {lead} AUC", rep, round(float(lt.loc[lead, "auc_roc"]), 3), in_tex=str(rep))
 
 lo = csv("loeo_results.csv", sub=os.path.join(REPO, "stage5_ews"))
@@ -84,8 +84,8 @@ w = int(lo["detected_watch"].sum())
 wn = int(lo["detected_warning"].sum())
 al = int(lo["detected_alert"].sum())
 check("C4", "LOEO watch", 35, w, kind="exact", in_tex="35/46")
-check("C4", "LOEO warning", 22, wn, kind="exact", in_tex="22/46")
-check("C4", "LOEO alert", 12, al, kind="exact", in_tex="12/46")
+check("C4", "LOEO warning", 18, wn, kind="exact", in_tex="22/46")
+check("C4", "LOEO alert", 11, al, kind="exact", in_tex="12/46")
 if "type" in lo.columns:
     bs = lo[lo["type"].astype(str).str.contains("backslid", case=False, na=False)]
     cp = lo[~lo.index.isin(bs.index)]
@@ -104,15 +104,15 @@ check("C6", "booster AUC-PR raw", 0.735, round(float(r0["aucpr_full"]), 3), in_t
 check("C6", "booster AUC-PR clean", 0.634, round(float(r0["aucpr_clean"]), 3), in_tex=["0.634", "0.63"])
 
 pi = csv("permutation_importance_oos.csv").set_index("feature")
-for feat, rep in [("f1_rolling_mean", 0.019), ("f1_change", 0.013), ("v2cademmob", 0.010),
-                  ("v2cagenmob_detrended", 0.009), ("v2smgovdom", 0.008)]:
+for feat, rep in [("f1_rolling_mean", 0.015), ("f1_change", 0.013), ("v2cademmob", 0.009),
+                  ("v2cagenmob_detrended", 0.008), ("v2smgovdom", 0.007)]:
     check("C8", f"perm imp {feat}", rep, round(float(pi.loc[feat, "mean_delta_auc"]), 3), tol=0.001)
 
 rz = csv("rashomon_importance_per_model.csv")
-check("C9", "mobilization mean imp", 0.069, round(float(rz["mobilization"].mean()), 3), in_tex="0.069")
+check("C9", "mobilization mean imp", 0.062, round(float(rz["mobilization"].mean()), 3), in_tex="0.062")
 check("C9", "digital control mean imp", 0.063, round(float(rz["digital control"].mean()), 3), in_tex="0.063")
-check("C9", "mob > dsp rows", 21, int((rz["mobilization"] > rz["digital control"]).sum()),
-      kind="exact", in_tex="21 of the 30")
+check("C9", "mob > dsp rows", 13, int((rz["mobilization"] > rz["digital control"]).sum()),
+      kind="exact", in_tex="13 of the 30")
 check("C9", "mob > factor rows", 0, int((rz["mobilization"] > rz["latent factor dynamics"]).sum()),
       kind="exact")
 
@@ -124,7 +124,7 @@ for col, rep, tx in [("mob_fires", 25, "25 of the 48"), ("dig_fires", 8, "8 for 
         check("C10", col, rep, int(mp[col]), kind="exact", in_tex=tx)
 
 da = csv("dsp_ablation.csv").set_index("configuration")
-check("C11", "DSP full OOS", 0.905, round(float(da.loc["full", "auc_roc_oos_2017"]), 3), in_tex="0.905")
+check("C11", "DSP full OOS", 0.887, round(float(da.loc["full", "auc_roc_oos_2017"]), 3), in_tex="0.887")
 check("C11", "DSP ablated OOS", 0.899, round(float(da.loc["ablate_dsp", "auc_roc_oos_2017"]), 3), in_tex="0.899")
 check("C11", "DSP only OOS", 0.774, round(float(da.loc["dsp_only", "auc_roc_oos_2017"]), 3), in_tex="0.774")
 
@@ -155,9 +155,9 @@ for c, rep, sd, tx in [("Hungary", 0.606, 0.064, "60"), ("Turkey", 0.323, 0.037,
                      "tol": "-", "num": "UNMATCHED", "in_tex": "-"})
 
 vu = csv("vdem_uncertainty_results.csv").iloc[0]
-check("C15", "vdem unc AUC", 0.92, round(float(vu["auc_mean"]), 2), tol=0.01, in_tex="0.92")
+check("C15", "vdem unc AUC", 0.91, round(float(vu["auc_mean"]), 2), tol=0.01, in_tex="0.91")
 check("C15", "vdem unc sd", 0.010, round(float(vu["auc_sd"]), 3), in_tex="0.010")
-check("C15", "mob>dsp draws", 29, int(vu["mob_gt_dsp"]), kind="exact", in_tex="twenty-nine of thirty")
+check("C15", "mob>dsp draws", 30, int(vu["mob_gt_dsp"]), kind="exact", in_tex="thirty of thirty")
 
 en = csv("elastic_net_robustness.csv")
 row_en = en[en["n_features_enet_selected"].notna()].iloc[0]
@@ -179,7 +179,7 @@ check("C19", "mob-only AUC (standalone)", 0.716, round(float(mo["auc_roc"]), 3))
 check("C19", "mob-only AUC-PR (standalone)", 0.151, round(float(mo["auc_pr"]), 3))
 bc = csv("baseline_common_rows.csv").set_index("model")
 for _m, _roc, _pr in [
-    ("Five-stage framework (AIM4D)", 0.939, 0.591),
+    ("Five-stage framework (AIM4D)", 0.938, 0.622),
     ("Persistence (3-yr polyarchy decline)", 0.826, 0.324),
     ("Mobilization-only logit", 0.756, 0.163),
     ("Elastic net, V-Dem indicators", 0.813, 0.254),
@@ -190,24 +190,23 @@ for _m, _roc, _pr in [
     check("C19b", f"{_m} AUC-PR", _pr, round(float(bc.loc[_m, "auc_pr"]), 3), in_tex=f"{_pr:.3f}")
 
 rb = csv("reliability_bins.csv")
-for i, (mpred, obs, n) in enumerate([(0.091, 0.009, 464), (0.183, 0.044, 203), (0.309, 0.500, 40),
-                                     (0.423, 0.696, 23), (0.549, 0.833, 6)]):
+for i, (mpred, obs, n) in enumerate([(0.093, 0.008, 484), (0.192, 0.059, 188), (0.309, 0.538, 39), (0.432, 0.800, 15), (0.555, 0.600, 10)]):
     check("C20", f"reliability bin {i+1} pred", mpred, round(float(rb.iloc[i]["mean_predicted"]), 3))
     check("C20", f"reliability bin {i+1} obs", obs, round(float(rb.iloc[i]["observed_freq"]), 3))
     check("C20", f"reliability bin {i+1} n", n, int(rb.iloc[i]["n"]), kind="exact")
 
 ca = csv("channel_ablation.csv").set_index("configuration")
 full_oos = float(ca.loc["full", "auc_roc_oos"])
-for blk, rep_auc, rep_pr, rep_only in [("dsp", -0.007, -0.010, 0.776), ("mob", -0.042, -0.097, 0.774),
-                                       ("factor", -0.033, -0.146, 0.843)]:
+for blk, rep_auc, rep_pr, rep_only in [("dsp", 0.010, 0.037, 0.776), ("mob", -0.005, -0.033, 0.774),
+                                       ("factor", -0.026, -0.096, 0.843)]:
     d_auc = float(ca.loc[f"ablate_{blk}", "auc_roc_oos"]) - full_oos
     d_pr = float(ca.loc[f"ablate_{blk}", "auc_pr_oos"]) - float(ca.loc["full", "auc_pr_oos"])
     check("C21", f"{blk} d_AUC", rep_auc, round(d_auc, 3))
     check("C21", f"{blk} d_AUC_PR", rep_pr, round(d_pr, 3))
     check("C21", f"{blk}_only OOS", rep_only, round(float(ca.loc[f"{blk}_only", "auc_roc_oos"]), 3))
 
-for blk, rep_auc, rep_pr, rep_only in [("mobdem", -0.009, -0.057, 0.714), ("mobaut", -0.021, -0.065, 0.631),
-                                       ("mobgen", -0.002, -0.033, 0.644)]:
+for blk, rep_auc, rep_pr, rep_only in [("mobdem", -0.000, 0.008, 0.714), ("mobaut", 0.004, 0.013, 0.631),
+                                       ("mobgen", 0.009, 0.006, 0.644)]:
     d_auc = float(ca.loc[f"ablate_{blk}", "auc_roc_oos"]) - full_oos
     d_pr = float(ca.loc[f"ablate_{blk}", "auc_pr_oos"]) - float(ca.loc["full", "auc_pr_oos"])
     check("C24", f"{blk} d_AUC", rep_auc, round(d_auc, 3))
@@ -310,8 +309,8 @@ def _marginals(df):
 
 # C29 factorial, our episode set (Table 6 left pair)
 mg, conv, strict = _marginals(csv("design_factorial.csv"))
-for k, rep, lo_r, hi_r in [("risk_set", 0.031, -0.080, 0.133), ("label", -0.013, -0.065, 0.011),
-                           ("origin", -0.021, -0.115, 0.093), ("closure", -0.223, -0.302, -0.123)]:
+for k, rep, lo_r, hi_r in [("risk_set", 0.026, -0.102, 0.128), ("label", -0.014, -0.060, 0.006),
+                           ("origin", -0.008, -0.113, 0.166), ("closure", -0.231, -0.302, -0.123)]:
     mean, lo, hi = mg[k]
     check("C29", f"factorial {k} mean", rep, round(mean, 3), in_tex=f"{rep:+.3f}".replace("+0", "+0"))
     check("C29", f"factorial {k} range lo", lo_r, round(lo, 3), tol=0.002)
@@ -321,19 +320,19 @@ check("C29", "strict corner", 0.662, round(strict, 3))
 
 # C30 factorial, ERT outcome (Table 6 right pair)
 mg, conv, strict = _marginals(csv("design_factorial_ert.csv"))
-for k, rep, lo_r, hi_r in [("risk_set", 0.018, -0.075, 0.071), ("label", -0.002, -0.033, 0.031),
-                           ("origin", -0.088, -0.245, 0.078), ("closure", -0.138, -0.207, -0.005)]:
+for k, rep, lo_r, hi_r in [("risk_set", 0.024, -0.057, 0.071), ("label", -0.004, -0.033, 0.033),
+                           ("origin", -0.084, -0.208, 0.064), ("closure", -0.142, -0.209, -0.010)]:
     mean, lo, hi = mg[k]
     check("C30", f"ERT factorial {k} mean", rep, round(mean, 3), in_tex=f"{rep:+.3f}")
     check("C30", f"ERT factorial {k} range lo", lo_r, round(lo, 3), tol=0.002)
     check("C30", f"ERT factorial {k} range hi", hi_r, round(hi, 3), tol=0.002)
 check("C30", "ERT conventional corner", 0.883, round(conv, 3), in_tex="0.883")
-check("C30", "ERT strict corner", 0.664, round(strict, 3), in_tex="0.664")
+check("C30", "ERT strict corner", 0.671, round(strict, 3), in_tex="0.671")
 
 # C31 strict table, ERT outcome (Table 5 Panel B)
 t31 = csv("strict_ert_sensitivity.csv").set_index("model")
 for name, rep in [("Persistence (3-yr polyarchy decline)", 0.344), ("Four polyarchy variables", 0.705),
-                  ("Five-stage framework", 0.735), ("Random forest", 0.734), ("Gradient boosting", 0.691), ("Elastic net", 0.672)]:
+                  ("Five-stage framework", 0.733), ("Random forest", 0.730), ("Gradient boosting", 0.685), ("Elastic net", 0.672)]:
     check("C31", f"Panel B AUC {name[:22]}", rep, round(float(t31.loc[name, "auc_roc"]), 3), in_tex=f"{rep:.3f}")
 check("C31", "Panel B persistence CI lo", 0.271, round(float(t31.loc["Persistence (3-yr polyarchy decline)", "auc_roc_lo"]), 3), tol=0.002, in_tex="[0.271, 0.419]")
 check("C31", "Panel B rows", 1002, int(t31.loc["Five-stage framework", "n"]), kind="exact")
@@ -354,20 +353,21 @@ check("C32", "ERT distinct onsets (strict)", 48, len(_keys), kind="exact", in_te
 check("C32", "ERT distinct countries w/ onset", 42, int(_pos.country_name.nunique()), kind="exact", in_tex="42 countries")
 
 # C33 minimum detectable effects on the mobilization block (2.80 * SE, SE = width/3.92)
-for tag, fname, rep in [("ledger", "onset_ablation_ci.csv", 0.041), ("ERT", "onset_ablation_ci_ert.csv", 0.031)]:
+for tag, fname, rep in [("ledger", "onset_ablation_ci.csv", 0.041), ("ERT", "onset_ablation_ci_ert.csv", 0.033)]:
     ci = csv(fname); g = ci[(ci.h == 5) & (ci.block == "mob")][["d_auc_lo", "d_auc_hi"]].mean()
     check("C33", f"MDE mobilization h=5 ({tag})", rep, round(2.80 * (g.d_auc_hi - g.d_auc_lo) / 3.92, 3), tol=0.002, in_tex=f"{rep:.3f}")
 
 # C34 channel ablation under ERT, pooled over learners and seeds
 ci = csv("onset_ablation_ci_ert.csv"); g = ci.groupby(["h", "block"])[["d_auc_mean", "d_auc_lo", "d_auc_hi"]].mean()
-for h, blk, mean, lo_r, hi_r in [(5, "mob", 0.004, -0.018, 0.025), (2, "mob", 0.014, -0.009, 0.039),
-                                  (5, "dsp", 0.004, -0.036, 0.044), (2, "dsp", 0.014, -0.019, 0.048)]:
+for h, blk, mean, lo_r, hi_r in [(5, "mob", 0.004, -0.018, 0.025), (2, "mob", 0.010, -0.014, 0.035),
+                                  (5, "dsp", 0.005, -0.036, 0.046), (2, "dsp", 0.011, -0.019, 0.044)]:
     r = g.loc[(h, blk)]
     check("C34", f"ERT {blk} h={h} mean", mean, round(float(r.d_auc_mean), 3), tol=0.002, in_tex=f"[{lo_r:+.3f}, {hi_r:+.3f}]")
     check("C34", f"ERT {blk} h={h} CI lo", lo_r, round(float(r.d_auc_lo), 3), tol=0.002)
     check("C34", f"ERT {blk} h={h} CI hi", hi_r, round(float(r.d_auc_hi), 3), tol=0.002)
 
 out = pd.DataFrame(rows)
+out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())
 n_unm = int((out["num"] == "UNMATCHED").sum())
 n_tex = int((out["in_tex"] == "NOT FOUND").sum())

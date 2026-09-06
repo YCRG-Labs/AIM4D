@@ -224,6 +224,149 @@ for S, kw, ku in [(3, 0.574, 0.444), (4, 0.647, 0.479), (5, 0.718, 0.500), (6, 0
 check("C22", "locked S=5 reproduces pipeline", 0.72, round(float(hl.loc[5, "kappa_w"]), 2), tol=0.01)
 check("C22", "sanity kappa", 0.58, round(float(sc["hmm_kappa_real"]), 2), tol=0.01, in_tex="0.58")
 
+
+# ---------------------------------------------------------------------------
+# C27-C34: headline forecasting numbers that were outside the audit until
+# referee2 round 1 (2026-09-06). Each is recomputed from the committed CSV.
+# ---------------------------------------------------------------------------
+from sklearn.metrics import roc_auc_score, average_precision_score
+from scipy.stats import rankdata
+
+
+def _blend(e):
+    b = e.pivot_table(index=["origin", "country_name", "y"], columns="learner", values="p").reset_index()
+    acc = np.zeros(len(b))
+    for L in ("gb", "rf", "lr"):
+        v = b[L].fillna(b[L].median()).values; r = np.zeros(len(v))
+        for o in b.origin.unique():
+            m = (b.origin == o).values; r[m] = rankdata(v[m]) / m.sum()
+        acc += r
+    b["blend"] = acc / 3
+    return b
+
+
+def _paired(y, pa, pb, c, seed=20260905, n=2000):
+    rng = np.random.default_rng(seed); u = np.unique(c); idx = {k: np.where(c == k)[0] for k in u}
+    da = []
+    for _ in range(n):
+        j = np.concatenate([idx[k] for k in rng.choice(u, len(u), replace=True)])
+        if y[j].sum() < 3 or y[j].sum() == len(j):
+            continue
+        da.append(roc_auc_score(y[j], pa[j]) - roc_auc_score(y[j], pb[j]))
+    return float(np.percentile(da, 2.5)), float(np.percentile(da, 97.5))
+
+
+# C27 end-to-end, our episode set
+e2e = _blend(csv("strict_endtoend_refit.csv"))
+sp = csv("strict_table_predictions_h5.csv")
+fw = sp[sp.model == "Five-stage framework, rank-mean blend"][["country_name", "year", "p"]].rename(columns={"p": "p_shared"})
+pv = sp[sp.model == "Four polyarchy variables"][["country_name", "year", "p"]].rename(columns={"p": "p_poly4"})
+m27 = e2e.merge(fw, left_on=["country_name", "origin"], right_on=["country_name", "year"]).merge(pv, on=["country_name", "year"])
+check("C27", "end-to-end blend AUC (ledger)", 0.693, round(roc_auc_score(m27.y, m27.blend), 3), in_tex="0.693")
+check("C27", "end-to-end blend AP (ledger)", 0.219, round(average_precision_score(m27.y, m27.blend), 3), in_tex="0.219")
+check("C27", "shared-rep AUC on same rows", 0.662, round(roc_auc_score(m27.y, m27.p_shared), 3))
+check("C27", "four-var AUC on same rows", 0.686, round(roc_auc_score(m27.y, m27.p_poly4), 3), in_tex="0.686")
+check("C27", "e2e minus shared, point", 0.030, round(roc_auc_score(m27.y, m27.blend) - roc_auc_score(m27.y, m27.p_shared), 3), in_tex="+0.030")
+lo, hi = _paired(m27.y.values, m27.blend.values, m27.p_shared.values, m27.country_name.values)
+check("C27", "e2e minus shared, CI lo", -0.038, round(lo, 3), tol=0.01, in_tex="[-0.038, +0.101]")
+check("C27", "e2e minus shared, CI hi", 0.101, round(hi, 3), tol=0.01)
+check("C27", "e2e minus four-var, point", 0.007, round(roc_auc_score(m27.y, m27.blend) - roc_auc_score(m27.y, m27.p_poly4), 3), in_tex="+0.007")
+lo, hi = _paired(m27.y.values, m27.blend.values, m27.p_poly4.values, m27.country_name.values)
+check("C27", "e2e minus four-var, CI lo", -0.097, round(lo, 3), tol=0.01, in_tex="[-0.097, +0.111]")
+check("C27", "e2e minus four-var, CI hi", 0.111, round(hi, 3), tol=0.01)
+check("C27", "e2e scored rows", 629, len(m27), kind="exact", in_tex="629")
+check("C27", "e2e positives", 88, int(m27.y.sum()), kind="exact", in_tex="88 positives")
+
+# C28 end-to-end, ERT outcome
+c28 = csv("strict_endtoend_ert_comparison.csv").set_index("model")
+check("C28", "ERT e2e AUC", 0.662, round(float(c28.loc["end_to_end", "auc_roc"]), 3), in_tex="0.662")
+check("C28", "ERT e2e AP", 0.295, round(float(c28.loc["end_to_end", "auc_pr"]), 3), in_tex="0.295")
+check("C28", "ERT shared-rep AUC", 0.680, round(float(c28.loc["shared_representation", "auc_roc"]), 3))
+check("C28", "ERT shared-rep AP", 0.323, round(float(c28.loc["shared_representation", "auc_pr"]), 3), in_tex="0.323")
+check("C28", "ERT four-var AUC", 0.638, round(float(c28.loc["four_polyarchy", "auc_roc"]), 3), in_tex="0.638")
+check("C28", "ERT e2e minus shared, point", -0.018, round(float(c28.loc["end_to_end_minus_shared", "auc_roc"]), 3), in_tex="-0.018")
+check("C28", "ERT e2e minus shared, CI lo", -0.056, round(float(c28.loc["end_to_end_minus_shared", "auc_roc_lo"]), 3), tol=0.01, in_tex="[-0.056, +0.018]")
+check("C28", "ERT e2e minus shared, CI hi", 0.018, round(float(c28.loc["end_to_end_minus_shared", "auc_roc_hi"]), 3), tol=0.01)
+check("C28", "ERT e2e minus four-var, point", 0.025, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc"]), 3), in_tex="+0.025")
+check("C28", "ERT e2e minus four-var, CI lo", -0.034, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc_lo"]), 3), tol=0.01, in_tex="[-0.034, +0.087]")
+check("C28", "ERT e2e minus four-var, CI hi", 0.087, round(float(c28.loc["end_to_end_minus_four_polyarchy", "auc_roc_hi"]), 3), tol=0.01)
+check("C28", "ERT e2e rows", 535, int(c28.loc["end_to_end", "n"]), kind="exact", in_tex="535")
+
+
+def _marginals(df):
+    keys = ["risk_set", "label", "origin", "closure"]; out = {}
+    for k in keys:
+        others = [x for x in keys if x != k] + ["learner"]
+        piv = df.pivot_table(index=others, columns=k, values="auc")
+        a, b = list(piv.columns); d = (piv[b] - piv[a]).dropna()
+        # orient as the cost of the stricter setting, as Table 6 reports
+        sign = -1 if k in ("label", "closure") else 1
+        out[k] = (sign * float(d.mean()), sign * float(d.max()) if sign < 0 else float(d.min()),
+                  sign * float(d.min()) if sign < 0 else float(d.max()))
+    conv = df[(df.risk_set == "all") & (df.label == "window") & (df.origin == "fixed-2019") & (df.closure == "none")].auc.mean()
+    strict = df[(df.risk_set == "at-risk") & (df.label == "future-only") & (df.origin == "rolling") & (df.closure == "enforced")].auc.mean()
+    return out, float(conv), float(strict)
+
+
+# C29 factorial, our episode set (Table 6 left pair)
+mg, conv, strict = _marginals(csv("design_factorial.csv"))
+for k, rep, lo_r, hi_r in [("risk_set", 0.031, -0.080, 0.133), ("label", -0.013, -0.065, 0.011),
+                           ("origin", -0.021, -0.115, 0.093), ("closure", -0.223, -0.302, -0.123)]:
+    mean, lo, hi = mg[k]
+    check("C29", f"factorial {k} mean", rep, round(mean, 3), in_tex=f"{rep:+.3f}".replace("+0", "+0"))
+    check("C29", f"factorial {k} range lo", lo_r, round(lo, 3), tol=0.002)
+    check("C29", f"factorial {k} range hi", hi_r, round(hi, 3), tol=0.002)
+check("C29", "conventional corner", 0.874, round(conv, 3), in_tex="0.874")
+check("C29", "strict corner", 0.662, round(strict, 3))
+
+# C30 factorial, ERT outcome (Table 6 right pair)
+mg, conv, strict = _marginals(csv("design_factorial_ert.csv"))
+for k, rep, lo_r, hi_r in [("risk_set", 0.018, -0.075, 0.071), ("label", -0.002, -0.033, 0.031),
+                           ("origin", -0.088, -0.245, 0.078), ("closure", -0.138, -0.207, -0.005)]:
+    mean, lo, hi = mg[k]
+    check("C30", f"ERT factorial {k} mean", rep, round(mean, 3), in_tex=f"{rep:+.3f}")
+    check("C30", f"ERT factorial {k} range lo", lo_r, round(lo, 3), tol=0.002)
+    check("C30", f"ERT factorial {k} range hi", hi_r, round(hi, 3), tol=0.002)
+check("C30", "ERT conventional corner", 0.883, round(conv, 3), in_tex="0.883")
+check("C30", "ERT strict corner", 0.664, round(strict, 3), in_tex="0.664")
+
+# C31 strict table, ERT outcome (Table 5 Panel B)
+t31 = csv("strict_ert_sensitivity.csv").set_index("model")
+for name, rep in [("Persistence (3-yr polyarchy decline)", 0.344), ("Four polyarchy variables", 0.705),
+                  ("Five-stage framework", 0.735), ("Random forest", 0.734), ("Gradient boosting", 0.691), ("Elastic net", 0.672)]:
+    check("C31", f"Panel B AUC {name[:22]}", rep, round(float(t31.loc[name, "auc_roc"]), 3), in_tex=f"{rep:.3f}")
+check("C31", "Panel B persistence CI lo", 0.271, round(float(t31.loc["Persistence (3-yr polyarchy decline)", "auc_roc_lo"]), 3), tol=0.002, in_tex="[0.271, 0.419]")
+check("C31", "Panel B rows", 1002, int(t31.loc["Five-stage framework", "n"]), kind="exact")
+check("C31", "Panel B positives", 179, int(t31.loc["Five-stage framework", "n_pos"]), kind="exact", in_tex="179 positives")
+
+# C32 distinct onsets behind the strict positives
+check("C32", "ledger distinct onsets (strict)", 28, int(sp[(sp.model == "Five-stage framework, rank-mean blend") & (sp.y == 1)].country_name.nunique()), kind="exact", in_tex="28 distinct onsets")
+sys.path.insert(0, ROB)
+from ert_panel import build_panel_ert
+_ep = build_panel_ert(); _ons = _ep.attrs["onsets"]
+_pb = csv("strict_ert_sensitivity_predictions.csv"); _pos = _pb[_pb.y == 1]
+_keys = set()
+for r in _pos.itertuples():
+    for o in sorted(_ons.get(r.country_name, [])):
+        if 1 <= o - r.year <= 5:
+            _keys.add((r.country_name, o)); break
+check("C32", "ERT distinct onsets (strict)", 48, len(_keys), kind="exact", in_tex="48 distinct onsets")
+check("C32", "ERT distinct countries w/ onset", 42, int(_pos.country_name.nunique()), kind="exact", in_tex="42 countries")
+
+# C33 minimum detectable effects on the mobilization block (2.80 * SE, SE = width/3.92)
+for tag, fname, rep in [("ledger", "onset_ablation_ci.csv", 0.041), ("ERT", "onset_ablation_ci_ert.csv", 0.031)]:
+    ci = csv(fname); g = ci[(ci.h == 5) & (ci.block == "mob")][["d_auc_lo", "d_auc_hi"]].mean()
+    check("C33", f"MDE mobilization h=5 ({tag})", rep, round(2.80 * (g.d_auc_hi - g.d_auc_lo) / 3.92, 3), tol=0.002, in_tex=f"{rep:.3f}")
+
+# C34 channel ablation under ERT, pooled over learners and seeds
+ci = csv("onset_ablation_ci_ert.csv"); g = ci.groupby(["h", "block"])[["d_auc_mean", "d_auc_lo", "d_auc_hi"]].mean()
+for h, blk, mean, lo_r, hi_r in [(5, "mob", 0.004, -0.018, 0.025), (2, "mob", 0.014, -0.009, 0.039),
+                                  (5, "dsp", 0.004, -0.036, 0.044), (2, "dsp", 0.014, -0.019, 0.048)]:
+    r = g.loc[(h, blk)]
+    check("C34", f"ERT {blk} h={h} mean", mean, round(float(r.d_auc_mean), 3), tol=0.002, in_tex=f"[{lo_r:+.3f}, {hi_r:+.3f}]")
+    check("C34", f"ERT {blk} h={h} CI lo", lo_r, round(float(r.d_auc_lo), 3), tol=0.002)
+    check("C34", f"ERT {blk} h={h} CI hi", hi_r, round(float(r.d_auc_hi), 3), tol=0.002)
+
 out = pd.DataFrame(rows)
 n_fail = int((out["num"] == "FAIL").sum())
 n_unm = int((out["num"] == "UNMATCHED").sum())

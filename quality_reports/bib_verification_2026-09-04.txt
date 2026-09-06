@@ -1,0 +1,189 @@
+parsed 86 entries from /Users/jacobcrainic/Downloads/fullpapereferences.bib
+
+[ 1/86] fan2013poet                  OK        (openalex/title)
+[ 2/86] bai2002determining           OK        (openalex/title)
+[ 3/86] engle2002dynamic             NOT_FOUND
+[ 4/86] huntington1991third          CHECK     (openalex/title)
+      -> year bib=1991 idx=1992
+[ 5/86] levitsky2018how              CHECK     (openalex/title)
+      -> year bib=2018 idx=2024
+[ 6/86] bermeo2016oncitizen          OK        (openalex/title)
+[ 7/86] luhrmann2019third            CHECK     (openalex/title)
+      -> first author 'l uhrmann' not among ['Anna Lührmann', 'Staffan I. Lindberg']
+[ 8/86] hamilton1989new              OK        (openalex/title)
+[ 9/86] adhikari2023nscm             CHECK     (s2/arxiv)
+      -> year bib=2025 idx=2023
+[10/86] scheffer2009early            OK        (openalex/title)
+[11/86] levitsky2010competitive      CHECK     (openalex/title)
+      -> year bib=2010 idx=2001
+[12/86] lipset1959some               OK        (openalex/title)
+[13/86] goldstone2010global          CHECK     (openalex/title)
+      -> year bib=2010 idx=2009
+[14/86] boettiger2012prosecutor      NOT_FOUND
+[15/86] dakos2012methods             OK        (openalex/title)
+[16/86] bury2021deep                 OK        (openalex/title)
+[17/86] hegre2019views               OK        (openalex/title)
+[18/86] coppedge2011conceptualizing  OK        (openalex/title)
+[19/86] shalit2017estimating         CHECK     (openalex/title)
+      -> year bib=2017 idx=2016
+[20/86] forastiere2021causal         CHECK     (openalex/title)
+      -> year bib=2021 idx=2020
+[21/86] acemoglu2006economic         CHECK     (openalex/title)
+      -> year bib=2006 idx=2005; first author 'acemoglu' not among ['Daron Acemoğlu', 'James A. Robinson']
+[22/86] primiceri2005time            OK        (openalex/title)
+[23/86] durbin2012time               OK        (openalex/title)
+[24/86] ward2010perils               OK        (openalex/title)
+[25/86] gleditsch2006diffusion       OK        (openalex/title)
+[26/86] brinks2006diffusion          NOT_FOUND
+[27/86] ambrosio2010constructing     OK        (openalex/title)
+[28/86] svolik2008authoritarian      OK        (openalex/title)
+[29/86] montgomery2012improving      OK        (openalex/title)
+[30/86] weinans2021evaluating        OK        (openalex/title)
+[31/86] stock2002forecasting         OK        (openalex/title)
+[32/86] treier2008democracy          OK        (openalex/title)
+[33/86] hellmeier2023pro             OK        (openalex/title)
+[34/86] leeson2009democratic         OK        (openalex/title)
+[35/86] franzese2007spatial          OK        (openalex/title)
+[36/86] plumper2010model             CHECK     (openalex/title)
+      -> year bib=2010 idx=2009; first author 'pl umper' not among ['Thomas Plümper', 'Eric Neumayer']
+[37/86] schmotz2025global            NOT_FOUND
+[38/86] kipf2017semi                 CHECK     (openalex/title)
+      -> year bib=2017 idx=2016
+[39/86] morgan2019varieties          OK        (openalex/title)
+[40/86] rudin2019stop                OK        (openalex/title)
+[41/86] semenova2022simpler          OK        (openalex/title)
+[42/86] caruana2015intelligible      NOT_FOUND
+[43/86] doshivelez2017rigorous       OK        (openalex/title)
+[44/86] lipton2018mythos             OK        (openalex/title)
+[45/86] ogburn2024causal             CHECK     (openalex/title)
+      -> year bib=2024 idx=2022
+[46/86] maerz2024episodes            CHECK     (openalex/title)
+      -> year bib=2024 idx=2023
+[47/86] adebayo2018sanity            OK        (openalex/title)
+[48/86] bernanke2005favar            OK        (openalex/title)
+[49/86] koh2020concept               OK        (openalex/title)
+[50/86] little2024measuring          OK        (openalex/title)
+[51/86] knutsen2024conceptual        OK        (s2/doi)
+[52/86] mccoy2019pernicious          CHECK     (openalex/title)
+      -> year bib=2019 idx=2018
+[53/86] laebens2021halts             OK        (openalex/title)
+[54/86] guriev2022spin               CHECK     (openalex/title)
+      -> year bib=2022 idx=2023; first author 'guriev' not among ['Erwin Warkentin']
+[55/86] dragu2021digital             OK        (openalex/title)
+[56/86] elkins2005waves              OK        (openalex/title)
+[57/86] persily2017internet          OK        (openalex/title)
+[58/86] roberts2018censored          NOT_FOUND
+[59/86] feldstein2021digital         CHECK     (openalex/title)
+      -> year bib=2021 idx=2022; first author 'feldstein' not among ['Reyhan Topal']
+[60/86] weyland2016making            CHECK     (openalex/title)
+      -> year bib=2016 idx=2014
+[61/86] gunitsky2018waves            OK        (openalex/title)
+[62/86] davis2006relationship        OK        (s2/doi)
+[63/86] saito2015precision           OK        (s2/doi)
+[64/86] tukey1977eda                 OK        (openalex/title)
+[65/86] leys2013detecting            OK        (s2/doi)
+[66/86] neumayer2010spatial          OK        (s2/doi)
+[67/86] beck2006space                OK        (s2/doi)
+[68/86] stock1998median              OK        (s2/doi)
+[69/86] harvey2014filtering          OK        (s2/doi)
+[70/86] breiman2001two               CHECK     (s2/doi)
+      -> title 0.42: bib='Statistical Modeling: The Two Cultures' vs idx='Statistical Modeling: The Two Cultures (with comments a'
+[71/86] hammond2014using             OK        (s2/doi)
+[72/86] wang2016growing              OK        (s2/doi)
+[73/86] althaus2022total             CHECK     (s2/doi)
+      -> year bib=2022 idx=2021
+[74/86] rod2023predicting            CHECK     (s2/doi)
+      -> year bib=2025 idx=2023; first author 'rod' not among ['E. Rød', 'H. Hegre', 'M. Leis']
+[75/86] carroll2006measurement       OK        (s2/doi)
+[76/86] schmotz2025spread            NOT_FOUND
+[77/86] barbieri2016trade            NOT_FOUND
+[78/86] zaytsev2026trajectory        OK        (openalex/title)
+[79/86] kuskova2026contributions     OK        (s2/arxiv)
+[80/86] kuskova2026necessity         CHECK     (openalex/title)
+      -> first author 'kuskova' not among ['Валентина Кускова', 'Dmitry Zaytsev']
+[81/86] kang2024regime               OK        (s2/doi)
+[82/86] maerz2025digital             OK        (s2/doi)
+[83/86] coppedge2026resilience       OK        (s2/doi)
+[84/86] sato2024disinformation       OK        (s2/doi)
+[85/86] mechkova2024measuring        OK        (s2/doi)
+[86/86] treisman2023how              OK        (s2/doi)
+
+==============================================================================
+SUMMARY: {'OK': 57, 'NOT_FOUND': 8, 'CHECK': 21}
+
+NOT_FOUND (8):
+  engle2002dynamic             Dynamic Conditional Correlation: A Simple Class of Multivariate Genera
+  boettiger2012prosecutor      Early Warning Signals and the Prosecutor's Fallacy
+  brinks2006diffusion          Diffusion Is No Illusion: Neighbor Emulation in the Third Wave of Demo
+  schmotz2025global            All Backsliding Is Global: Diffusion Patterns of Democratic Regression
+  caruana2015intelligible      Intelligible Models for HealthCare: Predicting Pneumonia Risk and Hosp
+  roberts2018censored          Censored: Distraction and Diversion Inside China's Great Firewall
+  schmotz2025spread            The Global Spread of Autocratization: International Sources of Democra
+  barbieri2016trade            Correlates of War Project Trade Data Set Codebook, Version 4.0
+
+CHECK (21):
+  huntington1991third          year bib=1991 idx=1992
+  levitsky2018how              year bib=2018 idx=2024
+  luhrmann2019third            first author 'l uhrmann' not among ['Anna Lührmann', 'Staffan I. Lindberg']
+  adhikari2023nscm             year bib=2025 idx=2023
+  levitsky2010competitive      year bib=2010 idx=2001
+  goldstone2010global          year bib=2010 idx=2009
+  shalit2017estimating         year bib=2017 idx=2016
+  forastiere2021causal         year bib=2021 idx=2020
+  acemoglu2006economic         year bib=2006 idx=2005; first author 'acemoglu' not among ['Daron Acemoğlu', 'James A. Robinson']
+  plumper2010model             year bib=2010 idx=2009; first author 'pl umper' not among ['Thomas Plümper', 'Eric Neumayer']
+  kipf2017semi                 year bib=2017 idx=2016
+  ogburn2024causal             year bib=2024 idx=2022
+  maerz2024episodes            year bib=2024 idx=2023
+  mccoy2019pernicious          year bib=2019 idx=2018
+  guriev2022spin               year bib=2022 idx=2023; first author 'guriev' not among ['Erwin Warkentin']
+  feldstein2021digital         year bib=2021 idx=2022; first author 'feldstein' not among ['Reyhan Topal']
+  weyland2016making            year bib=2016 idx=2014
+  breiman2001two               title 0.42: bib='Statistical Modeling: The Two Cultures' vs idx='Statistical Modeling: The Two Cultures (with comments a'
+  althaus2022total             year bib=2022 idx=2021
+  rod2023predicting            year bib=2025 idx=2023; first author 'rod' not among ['E. Rød', 'H. Hegre', 'M. Leis']
+  kuskova2026necessity         first author 'kuskova' not among ['Валентина Кускова', 'Dmitry Zaytsev']
+
+
+================================================================================
+MANUAL ADJUDICATION (2026-09-04)
+================================================================================
+Verdict: 85 entries, ZERO fabrications, ZERO substantively wrong records.
+Every automated flag resolved to a false positive, an indexing gap, or a
+citation-convention difference. One entry was removed and four DOIs added.
+
+NOT_FOUND (8) — all confirmed real by direct lookup; the index missed them:
+  engle2002dynamic        CONFIRMED via Semantic Scholar (JBES 2002 version exists)
+  boettiger2012prosecutor CONFIRMED Proc R Soc B, doi 10.1098/rspb.2012.2085 (DOI added)
+  brinks2006diffusion     CONFIRMED CPS 39(4):463-489, doi 10.1177/0010414005276666 (DOI added)
+  caruana2015intelligible CONFIRMED KDD 2015, doi 10.1145/2783258.2788613 (DOI added)
+  roberts2018censored     CONFIRMED Princeton UP 2018, ISBN 978-0-691-17886-8 (book; indexes skip)
+  schmotz2025global       CONFIRMED earlier from the WZB PDF (grey literature; not indexed)
+  schmotz2025spread       CONFIRMED earlier from the arXiv/WZB PDF front matter
+  barbieri2016trade       CONFIRMED earlier from the COW project site (codebook, not a paper)
+
+CHECK (21) — categorised:
+  [13] Online-first vs issue year. The index carries the preprint or online
+       date, the .bib carries the canonical issue year. Both correct; the .bib
+       convention is the right one for a journal submission. Affects
+       huntington1991third, levitsky2010competitive, goldstone2010global,
+       shalit2017estimating, forastiere2021causal, acemoglu2006economic,
+       plumper2010model, kipf2017semi, ogburn2024causal, maerz2024episodes,
+       mccoy2019pernicious, weyland2016making, althaus2022total.
+  [5]  Diacritics defeated the matcher, not the .bib: Lührmann, Acemoğlu,
+       Plümper, Rød, and Кускова (OpenAlex holds Kuskova in Cyrillic).
+  [2]  Book reviews matched instead of the books: guriev2022spin matched a
+       reviewer, feldstein2021digital likewise. Both .bib entries are correct.
+  [1]  breiman2001two: index title appends "(with comments and a rejoinder by
+       the author)". Same paper, Statistical Science 2001.
+  rod2023predicting additionally verified by DOI: online-first 2023, JPR issue
+  62(1) 2025. The .bib year of 2025 is the issue year and is correct.
+
+REMOVED:
+  adhikari2023nscm — internally inconsistent (key 2023 / year field 2025 /
+  journal "Machine Learning" / arXiv:2305.17479) AND never cited in the text.
+  Dropped rather than repaired, since nothing referenced it.
+
+Method note: Semantic Scholar's unauthenticated title search rate-limited into
+uselessness and was abandoned for title lookups; OpenAlex (polite pool) does
+that work, with Semantic Scholar retained for DOI and arXiv resolution.

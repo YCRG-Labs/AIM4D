@@ -280,3 +280,5 @@ The author-side editor applied the Stage 4 and SDEM fixes recommended above and 
 **`closure_placebo.py`** now uses identical seed sets for the observed statistic and every placebo draw, N_PERM defaults to 100, and the summary reports k of n. Rerun is in the cascade.
 
 **Status of the major concerns after this pass:** 1 (Stage 4 code) fixed and retrained, network sections being regenerated; 2 (SDEM) fixed and regenerated; 3 (hand-typed tables/figures) unchanged; 4 (replication package) partially addressed by `run_cascade_post_stage4.sh` and the tracked `quality_reports/`, README and pinning still open.
+
+**Determinism confirmed.** Two identical-code runs of the seeded Stage 5 differ in 0 of 246 numeric columns at a 1e-9 tolerance. Remaining byte-level differences are float representation in the last digits from `n_jobs=-1` summation order and never reach a reported figure. The cascade over every `ews_signals.csv`-dependent script was launched on the confirmed-deterministic output.

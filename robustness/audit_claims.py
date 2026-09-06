@@ -99,7 +99,7 @@ check("C5", "15-ep higher count", 14, int((sp["delta_risk"] > 0).sum()), kind="e
 
 bf = csv("benchmark_finishers_results.csv")
 r0 = bf.iloc[0]
-check("C6", "booster AUC raw", 0.940, round(float(r0["auc_full"]), 3), in_tex="0.940")
+check("C6", "booster AUC raw", 0.940, round(float(r0["auc_full"]), 3), in_tex="inflates the booster's figure further still")
 check("C6", "booster AUC-PR raw", 0.735, round(float(r0["aucpr_full"]), 3), in_tex="0.735")
 check("C6", "booster AUC-PR clean", 0.634, round(float(r0["aucpr_clean"]), 3), in_tex=["0.634", "0.63"])
 

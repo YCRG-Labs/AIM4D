@@ -34,6 +34,9 @@ WATCH_PCTL = float(os.environ.get("AIM4D_WATCH_PCTL", "0.80"))
 WARNING_PCTL = float(os.environ.get("AIM4D_WARNING_PCTL", "0.95"))
 ALERT_PCTL = float(os.environ.get("AIM4D_ALERT_PCTL", "0.98"))
 SEED_OFFSET = int(os.environ.get("AIM4D_SEED_OFFSET", "0"))
+# Referee2 round 1: the CSD surrogate generator draws from the global numpy RNG;
+# without this every run produced different eig/xcorr trend signals and alert tiers.
+np.random.seed(42 + SEED_OFFSET)
 NO_WRITE = (os.environ.get("AIM4D_NO_WRITE") == "1"
             or bool(os.environ.get("AIM4D_ABLATE_GROUP", "").strip())
             or SEED_OFFSET != 0)

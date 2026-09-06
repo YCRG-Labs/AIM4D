@@ -38,7 +38,8 @@ from onset_forecast_clean import build_panel, EXCLUDE_COLS
 OUT = os.path.dirname(os.path.abspath(__file__))
 H, LAST_OBS = 5, 2025
 ORIGINS = list(range(2005, LAST_OBS - H + 1))
-N_PERM = int(os.environ.get("AIM4D_PLACEBO_PERM", "12"))
+N_PERM = int(os.environ.get("AIM4D_PLACEBO_PERM", "100"))
+SEEDS = (0, 1)
 
 
 def learner(name, seed):
@@ -99,7 +100,7 @@ def main():
     rows = []
     d = base.copy()
     d["y"] = label_from(real_map, d)
-    real = [closure_contrast(d, feats, n, s) for n in ("gb", "rf", "lr") for s in (0, 1)]
+    real = [closure_contrast(d, feats, n, s) for n in ("gb", "rf", "lr") for s in SEEDS]
     real = [r for r in real if r is not None]
     print(f"observed closure contrast (enforced minus open): {np.mean(real):+.4f}")
     rows.append({"kind": "observed", "perm": -1, "mean_contrast": round(float(np.mean(real)), 4)})
@@ -115,7 +116,7 @@ def main():
         dp["y"] = label_from(pmap, dp)
         if dp.loc[dp.at_risk, "y"].sum() < 20:
             continue
-        vals = [closure_contrast(dp, feats, n, 0) for n in ("gb", "rf", "lr")]
+        vals = [closure_contrast(dp, feats, n, s) for n in ("gb", "rf", "lr") for s in SEEDS]
         vals = [v for v in vals if v is not None]
         if not vals:
             continue
@@ -129,8 +130,8 @@ def main():
           f"range [{pl.min():+.4f}, {pl.max():+.4f}]   n={len(pl)}")
     print(f"observed {np.mean(real):+.4f} lies "
           f"{(np.mean(real)-pl.mean())/max(pl.std(),1e-9):+.1f} placebo SDs from the placebo mean")
-    print(f"share of permutations at least as negative as observed: "
-          f"{float((pl <= np.mean(real)).mean()):.3f}")
+    k = int((pl <= np.mean(real)).sum())
+    print(f"permutations at least as negative as observed: {k} of {len(pl)}")
     pd.DataFrame(rows).to_csv(os.path.join(OUT, "closure_placebo.csv"), index=False)
     print("\nWrote closure_placebo.csv")
 

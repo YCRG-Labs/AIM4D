@@ -1,14 +1,14 @@
 model,param,est,ci_low,ci_high,note
-SEM,lambda,0.0541,-0.0165,0.0815,
-SDEM,lambda,0.0527,-0.0149,0.0819,
-SAC,lambda,0.0861,-0.4029,0.3399,
-SAR,rho,-0.0332,-0.4231,0.3429,"Kelejian-Prucha lags, F 2.0"
-SAR_lee,rho,0.3326,0.1585,0.5371,"Lee best instrument, F 78.9"
-SAC,rho,-0.0784,-0.4957,0.4298,generalised spatial 2SLS
-SDEM,theta_W.y_lag,0.0051,-0.0084,0.0099,
-SDEM,theta_W.gdp_pc,0.0005,-0.0049,0.0053,
-SDEM,theta_W.urbanization,-0.0008,-0.0075,0.0065,
-SDEM,theta_W.trade_openness,-0.0068,-0.0072,0.006,
+SEM,lambda,0.0541,-0.0144,0.0812,
+SDEM,lambda,0.0527,-0.0152,0.0828,
+SAC,lambda,0.0861,-0.4666,0.3656,
+SAR,rho,-0.0332,-0.4484,0.4334,"Kelejian-Prucha lags, F 2.0"
+SAR_lee,rho,0.3326,0.1537,0.542,"Lee best instrument, F 78.9"
+SAC,rho,-0.0784,-0.5611,0.5311,generalised spatial 2SLS
+SDEM,theta_W.y_lag,0.0051,-0.0025,0.013,
+SDEM,theta_W.gdp_pc,0.0005,-0.0052,0.0061,
+SDEM,theta_W.urbanization,-0.0008,-0.0071,0.0057,
+SDEM,theta_W.trade_openness,-0.0068,-0.0131,-0.0002,
 instrument strength,"first-stage F, Kelejian-Prucha lags",2.0355,,,cluster-robust
 instrument strength,"first-stage F, Lee best instrument",78.9453,,,strongest instrument available here
 instrument strength,fit of the outcome on X (not the spatial reduced form),0.0642,,,descriptive only; does not by itself establish an identification limit

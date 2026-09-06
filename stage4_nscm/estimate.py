@@ -114,6 +114,13 @@ def build_spatiotemporal_graph(df, countries_iso3, years, contig_pairs, alliance
     node_year = []
     node_mask_train = torch.zeros(total_nodes, dtype=torch.bool)
     node_mask_test = torch.zeros(total_nodes, dtype=torch.bool)
+    excl_iso3 = set()
+    if EXCLUDE_COUNTRY:
+        if "country_name" in df.columns:
+            excl_iso3 = set(df.loc[df["country_name"] == EXCLUDE_COUNTRY, "country_text_id"].unique())
+        if not excl_iso3:
+            excl_iso3 = {EXCLUDE_COUNTRY}
+        print(f"  Task F: excluding {sorted(excl_iso3)} from the Stage 4 training mask")
 
     for t, year in enumerate(years):
         df_year = df[df["year"] == year]
@@ -125,11 +132,12 @@ def build_spatiotemporal_graph(df, countries_iso3, years, contig_pairs, alliance
                 node_outcomes[nid] = torch.tensor(row[STATE_COLS].values[0], dtype=torch.float32)
             node_country.append(iso3)
             node_year.append(year)
-            if year <= TRAIN_CUTOFF:
+            if year <= TRAIN_CUTOFF and iso3 not in excl_iso3:
                 node_mask_train[nid] = True
-            else:
+            elif year > TRAIN_CUTOFF:
                 node_mask_test[nid] = True
 
+    raw_gdp = node_features[:, feature_cols.index("gdp_pc")].clone()
     feat_mean = node_features[node_mask_train].mean(dim=0)
     feat_std = node_features[node_mask_train].std(dim=0).clamp(min=1e-6)
     node_features = (node_features - feat_mean) / feat_std
@@ -166,8 +174,8 @@ def build_spatiotemporal_graph(df, countries_iso3, years, contig_pairs, alliance
             cultural_edges_src.append(offset + i)
             cultural_edges_dst.append(offset + j)
 
-        gdp_vals = node_features[offset:offset + N, -2].numpy()
-        log_gdp = np.log1p(np.abs(gdp_vals))
+        gdp_vals = raw_gdp[offset:offset + N].numpy()
+        log_gdp = np.log(np.maximum(gdp_vals, 1.0))
         diffs = np.abs(log_gdp[:, None] - log_gdp[None, :])
         np.fill_diagonal(diffs, np.inf)
         for i in range(N):
@@ -181,8 +189,6 @@ def build_spatiotemporal_graph(df, countries_iso3, years, contig_pairs, alliance
             for i in range(N):
                 temporal_edges_src.append(prev_offset + i)
                 temporal_edges_dst.append(offset + i)
-                temporal_edges_src.append(offset + i)
-                temporal_edges_dst.append(prev_offset + i)
 
         if t > 0:
             prev_offset = (t - 1) * N

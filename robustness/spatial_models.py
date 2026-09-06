@@ -265,7 +265,9 @@ def main():
                              "SAC.rho", "SAC.lambda"]}
     theta_boot = []
 
-    # (a) error-model family: regenerate from the SEM fit
+    # (a) error-model family. SEM regenerates from the SEM fit; SDEM regenerates
+    # from its OWN fit, beta, theta and lambda together, so the theta interval is
+    # centred on the estimated theta and not on zero (referee2 round 1, 1b.3).
     lam_e = float(np.clip(base["SEM"]["lambda"], -0.9, 0.9))
     beta_e, u_e = ols(y, Xe)
     eps_e = u_e - lam_e * Wop(u_e)
@@ -280,6 +282,22 @@ def main():
         if not np.isfinite(r["SEM"]["lambda"]):
             continue
         boots["SEM.lambda"].append(r["SEM"]["lambda"])
+
+    lam_d = float(np.clip(base["SDEM"]["lambda"], -0.9, 0.9))
+    Xd = np.column_stack([Xe, WX])
+    mean_d = Xe @ base["SDEM"]["beta"] + WX @ base["SDEM"]["theta"]
+    u_d = y - mean_d
+    eps_d = u_d - lam_d * Wop(u_d)
+    eps_d = eps_d - eps_d.mean()
+    for _ in range(N_BOOT):
+        e = eps_d * rng.choice([-1.0, 1.0], size=len(eps_d))
+        y_star = mean_d + neumann(e, lam_d)
+        try:
+            r = fit_all(y_star, Xe, WX, Wop, cid)
+        except Exception:
+            continue
+        if not np.isfinite(r["SDEM"]["lambda"]):
+            continue
         boots["SDEM.lambda"].append(r["SDEM"]["lambda"])
         theta_boot.append(r["SDEM"]["theta"])
 

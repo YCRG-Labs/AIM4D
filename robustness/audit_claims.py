@@ -421,6 +421,18 @@ _logs = sorted(_glob.glob("/Users/jacobcrainic/AIM4D/logs/cascade_*/bootstrap_ci
 _m = _re.search(r"n=(\d+), n_positive=(\d+)", open(_logs[-1]).read()) if _logs else None
 check("C40", "panel rows post-onset excluded", 3383, int(_m.group(1)) if _m else -1, kind="exact", in_tex="3{,}383 observations")
 check("C40", "positive country-years", 274, int(_m.group(2)) if _m else -1, kind="exact", in_tex="274 positive country-years")
+
+# C41: winsorization mode check, two full refits (Appendix B, Stage 2)
+_wm = csv("winsor_mode_check.csv").set_index("mode")
+check("C41", "kappa symmetric", 0.717, round(float(_wm.loc["symmetric", "kappa_w"]), 3), tol=0.002, in_tex="0.717 under both")
+check("C41", "kappa upper", 0.717, round(float(_wm.loc["upper", "kappa_w"]), 3), tol=0.002)
+check("C41", "hold-out AUC symmetric", 0.940, round(float(_wm.loc["symmetric", "oos_auc"]), 3), tol=0.002, in_tex="0.940 under symmetric")
+check("C41", "hold-out AUC upper", 0.935, round(float(_wm.loc["upper", "oos_auc"]), 3), tol=0.002, in_tex="0.935 under upper-tail")
+check("C41", "AP symmetric", 0.633, round(float(_wm.loc["symmetric", "oos_auc_pr"]), 3), tol=0.002, in_tex="0.633 against 0.584")
+check("C41", "AP upper", 0.584, round(float(_wm.loc["upper", "oos_auc_pr"]), 3), tol=0.002)
+check("C41", "LOEO watch symmetric", 36, int(_wm.loc["symmetric", "loeo_watch"]), kind="exact", in_tex="36 against 38 of 46")
+check("C41", "LOEO watch upper", 38, int(_wm.loc["upper", "loeo_watch"]), kind="exact")
+check("C41", "beta cells changed", 296, int(_wm.loc["symmetric", "beta_cells_changed_vs_other"]), kind="exact", in_tex="296 of the 29{,}576")
 out = pd.DataFrame(rows)
 out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())

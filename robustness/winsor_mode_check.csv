@@ -1,0 +1,3 @@
+mode,oos_auc,oos_auc_pr,n_pos,kappa_w,loeo_watch,loeo_warning,loeo_alert,loeo_total,beta_cells_changed_vs_other,beta_cells_total
+symmetric,0.9396383186705768,0.632484539713516,54,0.717,36,18,12,46,296,29576
+upper,0.9351308786792658,0.5842167445491374,54,0.717,38,19,10,46,296,29576

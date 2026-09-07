@@ -498,3 +498,25 @@ claims:
     last_verified_on: 2026-09-06T00:00:00Z
     last_verified_by: "reviewer pass on v27"
     status: PASS
+
+  - id: C40
+    claim: "Meta-learner panel: 274 positive country-years in 3,383 observations with post-onset years excluded (Limitations)"
+    location: "fullpaper.tex:Section 8.4"
+    source_file: robustness/bootstrap_cis.py
+    output_file: logs/cascade_*/bootstrap_cis.log (console summary; the csv carries n only)
+    output_field: "n, n_positive"
+    tolerance: {counts: exact}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "claims-and-consistency audit"
+    status: PASS
+
+  - id: C41
+    claim: "Winsorization mode, two full refits: kappa 0.717 under both rules; hold-out AUC 0.940 symmetric vs 0.935 upper-tail; AP 0.633 vs 0.584; LOEO watch 36 vs 38 of 46; 296 of 29,576 beta cells differ"
+    location: "fullpaper.tex:Appendix B, Stage 2"
+    source_file: robustness/winsor_mode_check.py
+    output_file: robustness/winsor_mode_check.csv
+    output_field: "kappa_w, oos_auc, oos_auc_pr, loeo_watch, beta_cells_changed_vs_other by mode"
+    tolerance: {point_estimate: 0.002, counts: exact}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "claims-and-consistency audit"
+    status: PASS

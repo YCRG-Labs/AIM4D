@@ -40,7 +40,7 @@ Checked and consistent: the sixfold gap is everywhere a one-run artifact; the fr
 
 ## Reproducibility note
 
-A full-pipeline refit in a clean worktree reproduces the canonical run to within 0.002 of hold-out AUC (0.940 against 0.938) and one LOEO episode (36 against 35 of 46). Stages 4 and 5 are seeded; the residual is under investigation (Stage 3 initialisation or thread-level nondeterminism). All within-experiment comparisons in the paper (winsorization, elastic-net pruning, LOEO refits) run both arms as refits, so this tolerance does not touch them.
+A full-pipeline refit in a clean worktree reproduces the canonical run to within 0.002 of hold-out AUC (0.940 against 0.938) and one LOEO episode (36 against 35 of 46). Stages 3, 4 and 5 are all seeded (HMM restarts carry random_state, Stage 4 sets torch and numpy seeds, Stage 5 seeds numpy), and Stages 1 and 2 are deterministic estimators, so the residual is thread-level floating-point nondeterminism in the torch and BLAS calls rather than an unseeded draw; it is small and does not touch any within-experiment comparison. All within-experiment comparisons in the paper (winsorization, elastic-net pruning, LOEO refits) run both arms as refits, so this tolerance does not touch them.
 
 ## Left for the author
 - The GDELT row in Table data_sources gives 1990 to 2025 (the years used) where Section 3.3 gives the archive as 1979 to present; a column note would settle it.

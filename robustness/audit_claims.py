@@ -403,6 +403,17 @@ check("C38", "locked Hungary direction", 0.419, round(float(_y.loc["Hungary", "n
 check("C38", "locked Moldova TV", 0.823, round(float(_y.loc["Moldova", "netdep_tv"]), 3), in_tex="$0.823$")
 check("C38", "locked Poland TV", 0.126, round(float(_y.loc["Poland", "netdep_tv"]), 3), in_tex="$0.126$")
 check("C38", "share signed toward autocracy", 0.44, round(float((_tv.netdep_signed > 0).mean()), 2), tol=0.005, in_tex="44 percent")
+
+# C39: paired contrast between the mobilization and digital-control blocks under the strict design (Section 5.4 strict paragraph)
+for tag, fname, vals in [("ledger", "channel_contrast_ledger.csv", {5: (-0.009, -0.055, 0.035, 0.064), 2: (-0.008, -0.063, 0.045, 0.077)}),
+                         ("ERT", "channel_contrast_ert.csv", {5: (-0.001, -0.050, 0.046, 0.068), 2: (-0.001, -0.038, 0.036, 0.053)})]:
+    _cc = csv(fname).groupby("h")[["contrast_mean", "contrast_lo", "contrast_hi"]].mean()
+    for h, (m_, lo_, hi_, mde_) in vals.items():
+        r = _cc.loc[h]
+        check("C39", f"{tag} h={h} contrast mean", m_, round(float(r.contrast_mean), 3), tol=0.002, in_tex=f"${m_:+.3f}$ $[{lo_:+.3f}, {hi_:+.3f}]$")
+        check("C39", f"{tag} h={h} contrast lo", lo_, round(float(r.contrast_lo), 3), tol=0.002)
+        check("C39", f"{tag} h={h} contrast hi", hi_, round(float(r.contrast_hi), 3), tol=0.002)
+        check("C39", f"{tag} h={h} contrast MDE", mde_, round(2.80 * float(r.contrast_hi - r.contrast_lo) / 3.92, 3), tol=0.002, in_tex=f"{mde_:.3f}")
 out = pd.DataFrame(rows)
 out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())

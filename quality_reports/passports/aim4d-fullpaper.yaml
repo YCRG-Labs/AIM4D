@@ -487,3 +487,14 @@ claims:
     last_verified_on: 2026-09-06T00:00:00Z
     last_verified_by: "post-stage4 cascade"
     status: PASS
+
+  - id: C39
+    claim: "Paired mobilization-minus-digital-control contrast under the strict design: h=5 ledger -0.009 [-0.055, +0.035] MDE 0.064, ERT -0.001 [-0.050, +0.046] MDE 0.068; h=2 ledger -0.008 [-0.063, +0.045] MDE 0.077, ERT -0.001 [-0.038, +0.036] MDE 0.053"
+    location: "fullpaper.tex:Section 5.4 strict-design channel paragraph + Introduction"
+    source_file: robustness/channel_contrast.py
+    output_file: robustness/channel_contrast_ledger.csv, robustness/channel_contrast_ert.csv
+    output_field: "contrast_mean/lo/hi averaged over learner x seed by horizon; MDE = 2.80 * (hi - lo) / 3.92"
+    tolerance: {point_estimate: 0.002}
+    last_verified_on: 2026-09-06T00:00:00Z
+    last_verified_by: "reviewer pass on v27"
+    status: PASS

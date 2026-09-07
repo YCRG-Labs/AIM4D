@@ -433,6 +433,22 @@ check("C41", "AP upper", 0.584, round(float(_wm.loc["upper", "oos_auc_pr"]), 3),
 check("C41", "LOEO watch symmetric", 36, int(_wm.loc["symmetric", "loeo_watch"]), kind="exact", in_tex="36 against 38 of 46")
 check("C41", "LOEO watch upper", 38, int(_wm.loc["upper", "loeo_watch"]), kind="exact")
 check("C41", "beta cells changed", 296, int(_wm.loc["symmetric", "beta_cells_changed_vs_other"]), kind="exact", in_tex="296 of the 29{,}576")
+
+# C42: consolidated-democracy boundary cases (Limitations), read from V-Dem v16
+_v = pd.read_csv("/Users/jacobcrainic/AIM4D/data/vdem_v16.csv", low_memory=False,
+                 usecols=["country_name", "year", "v2x_polyarchy"])
+for _c, _y, _rep in [("Portugal", 2018, 0.899), ("Portugal", 2025, 0.822),
+                     ("South Korea", 2018, 0.857), ("South Korea", 2025, 0.819)]:
+    _got = _v[(_v.country_name == _c) & (_v.year == _y)]["v2x_polyarchy"]
+    check("C42", f"{_c} polyarchy {_y}", _rep, round(float(_got.iloc[0]), 3), tol=0.002, in_tex=f"{_rep:.3f}")
+
+# C43: Stage 4 graph size (Supplement, Stage 4), re-derived by robustness/graph_counts.py
+_g = csv("graph_counts.csv").iloc[0]
+check("C43", "graph nodes", 4968, int(_g["nodes"]), kind="exact", in_tex="4{,}968 nodes")
+check("C43", "graph edges total", 227582, int(_g["edges_total"]), kind="exact", in_tex="227{,}582 edges")
+check("C43", "graph edges spatial", 222752, int(_g["edges_spatial"]), kind="exact", in_tex="222{,}752 are spatial")
+check("C43", "graph edges temporal", 4830, int(_g["edges_temporal"]), kind="exact", in_tex="4{,}830 are temporal")
+check("C43", "temporal forward only", 1, int(_g["temporal_is_forward_only"]), kind="exact", in_tex="never backwards")
 out = pd.DataFrame(rows)
 out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())

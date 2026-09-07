@@ -84,8 +84,8 @@ w = int(lo["detected_watch"].sum())
 wn = int(lo["detected_warning"].sum())
 al = int(lo["detected_alert"].sum())
 check("C4", "LOEO watch", 35, w, kind="exact", in_tex="35/46")
-check("C4", "LOEO warning", 18, wn, kind="exact", in_tex="22/46")
-check("C4", "LOEO alert", 11, al, kind="exact", in_tex="12/46")
+check("C4", "LOEO warning", 18, wn, kind="exact", in_tex="18/46")
+check("C4", "LOEO alert", 11, al, kind="exact", in_tex="11/46")
 if "type" in lo.columns:
     bs = lo[lo["type"].astype(str).str.contains("backslid", case=False, na=False)]
     cp = lo[~lo.index.isin(bs.index)]

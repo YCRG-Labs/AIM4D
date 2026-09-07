@@ -78,7 +78,78 @@ def first_surname(author_field):
     return norm(a.split(",")[0] if "," in a else a.split()[-1])
 
 
+CR = "https://api.crossref.org/works"
+AX = "http://export.arxiv.org/api/query"
+
+
+def _cr_map(it):
+    y = None
+    for k in ("issued", "published-print", "published-online", "created"):
+        dp = (it.get(k) or {}).get("date-parts") or []
+        if dp and dp[0] and dp[0][0]:
+            y = dp[0][0]
+            break
+    return {"title": (it.get("title") or [""])[0], "year": y,
+            "venue": (it.get("container-title") or [""])[0],
+            "authors": [{"name": f"{a.get('given', '')} {a.get('family', '')}".strip()}
+                        for a in (it.get("author") or [])[:5]]}
+
+
+def crossref_doi(doi):
+    r = get(f"{CR}/{urllib.parse.quote(doi)}")
+    it = (r or {}).get("message") or {}
+    return _cr_map(it) if it.get("title") else None
+
+
+def crossref_title(title):
+    q = urllib.parse.quote(norm(title)[:200])
+    r = get(f"{CR}?query.bibliographic={q}&rows=5")
+    items = [i for i in (((r or {}).get("message") or {}).get("items") or []) if i.get("title")]
+    if not items:
+        return None
+    best = max(items, key=lambda i: sim(title, i["title"][0]))
+    return _cr_map(best) if sim(title, best["title"][0]) >= 0.6 else None
+
+
+def arxiv_record(aid):
+    try:
+        req = urllib.request.Request(f"{AX}?id_list={aid}", headers={"User-Agent": "bib-verify/1.0"})
+        x = urllib.request.urlopen(req, timeout=30).read().decode()
+    except Exception:
+        return None
+    ent = x.split("<entry>")[1:]
+    if not ent:
+        return None
+    t = re.search(r"<title>(.*?)</title>", ent[0], re.S)
+    y = re.search(r"<published>(\d{4})", ent[0])
+    names = re.findall(r"<name>(.*?)</name>", ent[0])
+    if not t:
+        return None
+    return {"title": " ".join(t.group(1).split()), "year": int(y.group(1)) if y else None,
+            "venue": "arXiv", "authors": [{"name": n} for n in names[:5]]}
+
+
 def resolve(e):
+    doi = e.get("doi", "").strip()
+    if doi:
+        r = crossref_doi(doi)
+        if r:
+            return r, "crossref/doi"
+    ax = re.search(r"ar[Xx]iv:\s*([0-9.]+)", e.get("note", "") + " " + e.get("eprint", "")) \
+        or re.match(r"\s*(\d{4}\.\d{4,5})", e.get("eprint", ""))
+    if ax:
+        r = arxiv_record(ax.group(1))
+        if r:
+            return r, "arxiv/id"
+    title = e.get("title", "")
+    if title:
+        r = crossref_title(title)
+        if r:
+            return r, "crossref/title"
+    return resolve_s2_oa(e)
+
+
+def resolve_s2_oa(e):
     doi = e.get("doi", "").strip()
     if doi:
         r = get(f"{S2}/paper/DOI:{urllib.parse.quote(doi)}?fields={FIELDS}")

@@ -1,0 +1,187 @@
+parsed 97 entries from /Users/jacobcrainic/aim4d-paper/fullpapereferences.bib
+
+[ 1/97] fan2013poet                  CHECK     (crossref/title)
+      -> year bib=2013 idx=2011
+[ 2/97] bai2002determining           OK        (crossref/title)
+[ 3/97] engle2002dynamic             CHECK     (crossref/title)
+      -> title 0.69: bib='Dynamic Conditional Correlation: A Simple Class of Mult' vs idx='Dynamic Conditional Correlation - a Simple Class of Mul'; year bib=2002 idx=2000
+[ 4/97] huntington1991third          CHECK     (crossref/title)
+      -> year bib=1991 idx=1992
+[ 5/97] levitsky2018how              CHECK     (crossref/title)
+      -> year bib=2018 idx=2014
+[ 6/97] bermeo2016oncitizen          OK        (openalex/title)
+[ 7/97] luhrmann2019third            CHECK     (crossref/title)
+      -> first author 'l uhrmann' not among ['Anna Lührmann', 'Staffan I. Lindberg']
+[ 8/97] hamilton1989new              OK        (crossref/title)
+[ 9/97] scheffer2009early            CHECK     (crossref/title)
+      -> title 0.67: bib='Early-Warning Signals for Critical Transitions' vs idx='Early warning signals for critical transitions in compl'; year bib=2009 idx=2022; first author 'scheffer' not among ['', 'Haoyu Wen']
+[10/97] levitsky2010competitive      NOT_FOUND
+[11/97] lipset1959some               OK        (crossref/title)
+[12/97] goldstone2010global          CHECK     (crossref/title)
+      -> year bib=2010 idx=2009
+[13/97] boettiger2012prosecutor      OK        (crossref/doi)
+[14/97] dakos2012methods             OK        (crossref/title)
+[15/97] bury2021deep                 CHECK     (crossref/title)
+      -> title 0.60: bib='Deep Learning for Early Warning Signals of Tipping Poin' vs idx='Early warning signals for topological tipping points'; year bib=2021 idx=2022; first author 'bury' not among ['Gisela Daniela Charó', 'Michael Ghil', 'Denisse Sciamarella']
+[16/97] hegre2019views               OK        (openalex/title)
+[17/97] coppedge2011conceptualizing  OK        (openalex/title)
+[18/97] shalit2017estimating         CHECK     (openalex/title)
+      -> year bib=2017 idx=2016
+[19/97] forastiere2021causal         CHECK     (crossref/title)
+      -> year bib=2021 idx=2020
+[20/97] acemoglu2006economic         CHECK     (openalex/title)
+      -> year bib=2006 idx=2005; first author 'acemoglu' not among ['Daron Acemoğlu', 'James A. Robinson']
+[21/97] primiceri2005time            CHECK     (crossref/title)
+      -> year bib=2005 idx=2003
+[22/97] durbin2012time               OK        (crossref/title)
+[23/97] ward2010perils               OK        (crossref/title)
+[24/97] gleditsch2006diffusion       OK        (crossref/title)
+[25/97] brinks2006diffusion          CHECK     (crossref/doi)
+      -> title 0.33: bib='Diffusion Is No Illusion: Neighbor Emulation in the Thi' vs idx='Diffusion Is No Illusion'
+[26/97] ambrosio2010constructing     OK        (crossref/title)
+[27/97] svolik2008authoritarian      CHECK     (crossref/title)
+      -> year bib=2008 idx=2007
+[28/97] montgomery2012improving      OK        (crossref/title)
+[29/97] weinans2021evaluating        OK        (crossref/title)
+[30/97] stock2002forecasting         OK        (crossref/title)
+[31/97] treier2008democracy          OK        (crossref/title)
+[32/97] hellmeier2023pro             OK        (crossref/title)
+[33/97] leeson2009democratic         OK        (crossref/title)
+[34/97] franzese2007spatial          OK        (crossref/title)
+[35/97] plumper2010model             CHECK     (openalex/title)
+      -> year bib=2010 idx=2009; first author 'pl umper' not among ['Thomas Plümper', 'Eric Neumayer']
+[36/97] schmotz2025global            NOT_FOUND
+[37/97] kipf2017semi                 CHECK     (crossref/title)
+      -> title 0.67: bib='Semi-Supervised Classification with Graph Convolutional' vs idx='Hybrid Graph Convolutional Networks for Semi-Supervised'; year bib=2017 idx=2019
+[38/97] morgan2019varieties          OK        (crossref/title)
+[39/97] rudin2019stop                OK        (crossref/title)
+[40/97] semenova2022simpler          OK        (crossref/title)
+[41/97] caruana2015intelligible      CHECK     (crossref/doi)
+      -> title 0.33: bib='Intelligible Models for HealthCare: Predicting Pneumoni' vs idx='Intelligible Models for HealthCare'
+[42/97] doshivelez2017rigorous       OK        (openalex/title)
+[43/97] lipton2018mythos             OK        (crossref/title)
+[44/97] ogburn2024causal             CHECK     (crossref/title)
+      -> title 0.71: bib='Causal Inference for Social Network Data' vs idx='Causal Inference for Social Network Analysis'; year bib=2024 idx=2020; first author 'ogburn' not among ['Kenneth A. Frank', 'Ran Xu']
+[45/97] maerz2024episodes            CHECK     (crossref/doi)
+      -> year bib=2024 idx=2023
+[46/97] adebayo2018sanity            CHECK     (crossref/title)
+      -> year bib=2018 idx=2022; first author 'adebayo' not among ['Lars Holmberg', 'Carl Johan Helgstrand', 'Niklas Hultin']
+[47/97] bernanke2005favar            CHECK     (crossref/title)
+      -> year bib=2005 idx=2004
+[48/97] koh2020concept               OK        (openalex/title)
+[49/97] little2024measuring          CHECK     (crossref/title)
+      -> year bib=2024 idx=2023
+[50/97] knutsen2024conceptual        OK        (crossref/doi)
+[51/97] mccoy2019pernicious          CHECK     (crossref/title)
+      -> year bib=2019 idx=2018
+[52/97] laebens2021halts             OK        (crossref/title)
+[53/97] guriev2022spin               CHECK     (openalex/title)
+      -> year bib=2022 idx=2023; first author 'guriev' not among ['Erwin Warkentin']
+[54/97] dragu2021digital             OK        (crossref/title)
+[55/97] elkins2005waves              OK        (crossref/title)
+[56/97] persily2017internet          OK        (crossref/title)
+[57/97] roberts2018censored          NOT_FOUND
+[58/97] feldstein2021digital         CHECK     (openalex/title)
+      -> year bib=2021 idx=2022; first author 'feldstein' not among ['Reyhan Topal']
+[59/97] weyland2016making            OK        (openalex/title)
+[60/97] gunitsky2018waves            OK        (crossref/title)
+[61/97] davis2006relationship        OK        (crossref/doi)
+[62/97] saito2015precision           OK        (crossref/doi)
+[63/97] tukey1977eda                 CHECK     (crossref/title)
+      -> year bib=1977 idx=2018; first author 'tukey' not among ['Brian D. Haig']
+[64/97] leys2013detecting            OK        (crossref/doi)
+[65/97] neumayer2010spatial          OK        (crossref/doi)
+[66/97] beck2006space                OK        (crossref/doi)
+[67/97] stock1998median              OK        (crossref/doi)
+[68/97] harvey2014filtering          OK        (crossref/doi)
+[69/97] breiman2001two               CHECK     (crossref/doi)
+      -> title 0.42: bib='Statistical Modeling: The Two Cultures' vs idx='Statistical Modeling: The Two Cultures (with comments a'
+[70/97] hammond2014using             OK        (crossref/doi)
+[71/97] wang2016growing              OK        (crossref/doi)
+[72/97] althaus2022total             CHECK     (crossref/doi)
+      -> year bib=2022 idx=2021
+[73/97] rod2023predicting            CHECK     (crossref/doi)
+      -> year bib=2025 idx=2023; first author 'rod' not among ['Espen Geelmuyden Rød', 'Håvard Hegre', 'Maxine Leis']
+[74/97] carroll2006measurement       CHECK     (crossref/doi)
+      -> title 0.62: bib='Measurement Error in Nonlinear Models: A Modern Perspec' vs idx='Measurement Error in Nonlinear Models'
+[75/97] schmotz2025spread            NOT_FOUND
+[76/97] barbieri2016trade            NOT_FOUND
+[77/97] zaytsev2026trajectory        OK        (openalex/title)
+[78/97] kuskova2026contributions     OK        (s2/arxiv)
+[79/97] kuskova2026necessity         CHECK     (openalex/title)
+      -> first author 'kuskova' not among ['Валентина Кускова', 'Dmitry Zaytsev']
+[80/97] kang2024regime               OK        (crossref/doi)
+[81/97] maerz2025digital             OK        (crossref/doi)
+[82/97] coppedge2026resilience       OK        (crossref/doi)
+[83/97] sato2024disinformation       OK        (crossref/doi)
+[84/97] mechkova2024measuring        OK        (crossref/doi)
+[85/97] treisman2023how              OK        (crossref/doi)
+[86/97] hooker2021unrestricted       OK        (crossref/doi)
+[87/97] janzing2020feature           CHECK     (openalex/title)
+      -> year bib=2020 idx=2019
+[88/97] croushore2001real            OK        (crossref/doi)
+[89/97] weidmann2023recent           OK        (crossref/doi)
+[90/97] boese2021how                 OK        (crossref/doi)
+[91/97] lee2003best                  OK        (crossref/doi)
+[92/97] kelejian1998generalized      OK        (crossref/doi)
+[93/97] kelejian1999generalized      OK        (crossref/doi)
+[94/97] cook2020model                OK        (crossref/doi)
+[95/97] jin2015bootstrap             CHECK     (crossref/doi)
+      -> title 0.37: bib='On the bootstrap for {M}oran's {I} test for spatial dep' vs idx='On the bootstrap for Moran’s <mml:math xmlns:mml="http:'
+[96/97] bowlsby2020future            CHECK     (crossref/doi)
+      -> year bib=2020 idx=2019
+[97/97] hegre2021views2020           OK        (crossref/doi)
+
+==============================================================================
+SUMMARY: {'CHECK': 34, 'OK': 58, 'NOT_FOUND': 5}
+
+NOT_FOUND (5):
+  levitsky2010competitive      Competitive Authoritarianism: Hybrid Regimes After the Cold War
+  schmotz2025global            All Backsliding Is Global: Diffusion Patterns of Democratic Regression
+  roberts2018censored          Censored: Distraction and Diversion Inside China's Great Firewall
+  schmotz2025spread            The Global Spread of Autocratization: International Sources of Democra
+  barbieri2016trade            Correlates of War Project Trade Data Set Codebook, Version 4.0
+
+CHECK (34):
+  fan2013poet                  year bib=2013 idx=2011
+  engle2002dynamic             title 0.69: bib='Dynamic Conditional Correlation: A Simple Class of Mult' vs idx='Dynamic Conditional Correlation - a Simple Class of Mul'; year bib=2002 idx=2000
+  huntington1991third          year bib=1991 idx=1992
+  levitsky2018how              year bib=2018 idx=2014
+  luhrmann2019third            first author 'l uhrmann' not among ['Anna Lührmann', 'Staffan I. Lindberg']
+  scheffer2009early            title 0.67: bib='Early-Warning Signals for Critical Transitions' vs idx='Early warning signals for critical transitions in compl'; year bib=2009 idx=2022; first author 'scheffer' not among ['', 'Haoyu Wen']
+  goldstone2010global          year bib=2010 idx=2009
+  bury2021deep                 title 0.60: bib='Deep Learning for Early Warning Signals of Tipping Poin' vs idx='Early warning signals for topological tipping points'; year bib=2021 idx=2022; first author 'bury' not among ['Gisela Daniela Charó', 'Michael Ghil', 'Denisse Sciamarella']
+  shalit2017estimating         year bib=2017 idx=2016
+  forastiere2021causal         year bib=2021 idx=2020
+  acemoglu2006economic         year bib=2006 idx=2005; first author 'acemoglu' not among ['Daron Acemoğlu', 'James A. Robinson']
+  primiceri2005time            year bib=2005 idx=2003
+  brinks2006diffusion          title 0.33: bib='Diffusion Is No Illusion: Neighbor Emulation in the Thi' vs idx='Diffusion Is No Illusion'
+  svolik2008authoritarian      year bib=2008 idx=2007
+  plumper2010model             year bib=2010 idx=2009; first author 'pl umper' not among ['Thomas Plümper', 'Eric Neumayer']
+  kipf2017semi                 title 0.67: bib='Semi-Supervised Classification with Graph Convolutional' vs idx='Hybrid Graph Convolutional Networks for Semi-Supervised'; year bib=2017 idx=2019
+  caruana2015intelligible      title 0.33: bib='Intelligible Models for HealthCare: Predicting Pneumoni' vs idx='Intelligible Models for HealthCare'
+  ogburn2024causal             title 0.71: bib='Causal Inference for Social Network Data' vs idx='Causal Inference for Social Network Analysis'; year bib=2024 idx=2020; first author 'ogburn' not among ['Kenneth A. Frank', 'Ran Xu']
+  maerz2024episodes            year bib=2024 idx=2023
+  adebayo2018sanity            year bib=2018 idx=2022; first author 'adebayo' not among ['Lars Holmberg', 'Carl Johan Helgstrand', 'Niklas Hultin']
+  bernanke2005favar            year bib=2005 idx=2004
+  little2024measuring          year bib=2024 idx=2023
+  mccoy2019pernicious          year bib=2019 idx=2018
+  guriev2022spin               year bib=2022 idx=2023; first author 'guriev' not among ['Erwin Warkentin']
+  feldstein2021digital         year bib=2021 idx=2022; first author 'feldstein' not among ['Reyhan Topal']
+  tukey1977eda                 year bib=1977 idx=2018; first author 'tukey' not among ['Brian D. Haig']
+  breiman2001two               title 0.42: bib='Statistical Modeling: The Two Cultures' vs idx='Statistical Modeling: The Two Cultures (with comments a'
+  althaus2022total             year bib=2022 idx=2021
+  rod2023predicting            year bib=2025 idx=2023; first author 'rod' not among ['Espen Geelmuyden Rød', 'Håvard Hegre', 'Maxine Leis']
+  carroll2006measurement       title 0.62: bib='Measurement Error in Nonlinear Models: A Modern Perspec' vs idx='Measurement Error in Nonlinear Models'
+  kuskova2026necessity         first author 'kuskova' not among ['Валентина Кускова', 'Dmitry Zaytsev']
+  janzing2020feature           year bib=2020 idx=2019
+  jin2015bootstrap             title 0.37: bib='On the bootstrap for {M}oran's {I} test for spatial dep' vs idx='On the bootstrap for Moran’s <mml:math xmlns:mml="http:'
+  bowlsby2020future            year bib=2020 idx=2019
+
+TRIAGE (2026-09-06, after author+title and DOI re-lookups on Crossref, WZB site for the working papers)
+Real problems: none.
+- 21 CHECKs are year offsets where the title search hit a preprint, working paper, online-first or later-edition record (fan2013poet SSRN 2011, primiceri2005time SSRN 2003, bernanke2005favar NBER 2004, svolik2008 SSRN 2007, little2024 SSRN/OSF 2023, goldstone2010/forastiere2021/mccoy2019/ogburn2024/maerz2024/althaus2022/bowlsby2020/rod2023 online-first vs print, huntington1991 a 1992 review, acemoglu2006 2005 DOI date, levitsky2018 a 2024 reprint, janzing2020/shalit2017 arXiv). The bib uses print year throughout; rod2023predicting's 2025 is the JPR print year (online 2023), consistent with maerz2024/althaus2022/bowlsby2020.
+- 8 CHECKs are the title-search returning a different paper because the index lacks the venue (kipf2017 ICLR, adebayo2018 NeurIPS, shalit2017/janzing2020 PMLR, tukey1977 reviews, feldstein2021/guriev2022 book chapters, bury2021 found on second row) - entries verified against the true record.
+- 5 CHECKs are normalizer artifacts (Lührmann, Plümper, Rød, Acemoğlu, Kuskova in Cyrillic).
+- 5 CHECKs are DOI-resolved entries whose Crossref title omits the subtitle or carries MathML (brinks2006, caruana2015, breiman2001, carroll2006, jin2015) - DOI match is authoritative.
+- 5 NOT_FOUND: levitsky2010 (CUP DOI 10.1017/cbo9780511781353), roberts2018 (Princeton DOI 10.23943/9781400890057), barbieri2016 (COW trade codebook v4.0), schmotz2025global and schmotz2025spread (WZB working papers, 2025-04-18 and 2025-09-08, located on wzb.eu; URLs added to the bib).

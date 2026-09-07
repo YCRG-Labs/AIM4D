@@ -160,10 +160,10 @@ check("C15", "vdem unc sd", 0.010, round(float(vu["auc_sd"]), 3), in_tex="0.010"
 check("C15", "mob>dsp draws", 30, int(vu["mob_gt_dsp"]), kind="exact", in_tex="thirty of thirty")
 
 en = csv("elastic_net_robustness.csv")
-row_en = en[en["n_features_enet_selected"].notna()].iloc[0]
-check("C16", "enet selected", 89, int(row_en["n_features_enet_selected"]), kind="exact", in_tex="89")
-check("C16", "enet OOS AUC", 0.932, round(float(row_en["oos_auc"]), 3), in_tex="0.932")
-check("C16", "enet OOS AUC-PR", 0.602, round(float(row_en["oos_auc_pr"]), 3), in_tex="0.602")
+row_en = en[en["config"] == "elastic_net_pruned"].iloc[0]
+check("C16", "enet selected", 80, int(row_en["n_features_enet_selected"]), kind="exact", in_tex="80 of 212")
+check("C16", "enet OOS AUC", 0.940, round(float(row_en["oos_auc"]), 3), in_tex="0.940")
+check("C16", "enet OOS AUC-PR", 0.579, round(float(row_en["oos_auc_pr"]), 3), in_tex="0.579")
 
 sc = csv("sanity_checks_results.csv").iloc[0]
 check("C17", "perm congruence", 0.06, round(float(sc["factor_perm_congruence_mean"]), 2), tol=0.01, in_tex="0.06")
@@ -414,6 +414,13 @@ for tag, fname, vals in [("ledger", "channel_contrast_ledger.csv", {5: (-0.009, 
         check("C39", f"{tag} h={h} contrast lo", lo_, round(float(r.contrast_lo), 3), tol=0.002)
         check("C39", f"{tag} h={h} contrast hi", hi_, round(float(r.contrast_hi), 3), tol=0.002)
         check("C39", f"{tag} h={h} contrast MDE", mde_, round(2.80 * float(r.contrast_hi - r.contrast_lo) / 3.92, 3), tol=0.002, in_tex=f"{mde_:.3f}")
+
+# C40: meta-learner panel size and positives (Limitations); bootstrap_cis.py prints the count, the csv carries only n
+import glob as _glob, re as _re
+_logs = sorted(_glob.glob("/Users/jacobcrainic/AIM4D/logs/cascade_*/bootstrap_cis.log"))
+_m = _re.search(r"n=(\d+), n_positive=(\d+)", open(_logs[-1]).read()) if _logs else None
+check("C40", "panel rows post-onset excluded", 3383, int(_m.group(1)) if _m else -1, kind="exact", in_tex="3{,}383 observations")
+check("C40", "positive country-years", 274, int(_m.group(2)) if _m else -1, kind="exact", in_tex="274 positive country-years")
 out = pd.DataFrame(rows)
 out.to_csv(os.path.join(ROB, "audit_rows.csv"), index=False)
 n_fail = int((out["num"] == "FAIL").sum())
